@@ -11,6 +11,9 @@
   "_sync_guild_id_comment": "Set sync_guild_id to your server ID for instant slash command updates during development. Remove (or set to null) for global sync in production.",
   "sync_guild_id": null,
 
+  "_image_style_comment": "This is used to change how the image output is styled",
+  "image_style": "Gritty, high-contrast digital art. Dark humor aesthetic. Slightly worn and over-processed, like something scraped off the deep internet. Cinematic lighting. No corporate polish.",
+
   "personality": {
     "name": "Gork",
 

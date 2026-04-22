@@ -29,10 +29,11 @@ class ImageGenClient:
     Accepts a plain text prompt, returns PNG bytes.
     """
 
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, image_style: str = "") -> None:
         if not api_key:
             raise ValueError("hackclub_api_key is required for image generation.")
         self._api_key = api_key
+        self._image_style = image_style
         self._session: aiohttp.ClientSession | None = None
 
     async def _get_session(self) -> aiohttp.ClientSession:
@@ -65,10 +66,18 @@ class ImageGenClient:
         """
         # Do NOT send `modalities` — the Hack Club proxy rejects it with 404.
         # The gemini-2.5-flash-image model generates images natively.
+
+        # Prepend the image style from personality config if set.
+        # Format: "Style: <style>. Subject: <user prompt>"
+        if self._image_style:
+            full_prompt = f"Style: {self._image_style}. Subject: {prompt}"
+        else:
+            full_prompt = prompt
+
         payload: dict[str, Any] = {
             "model": IMAGE_MODEL,
             "messages": [
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": full_prompt}
             ],
         }
 

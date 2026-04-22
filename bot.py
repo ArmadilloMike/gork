@@ -31,7 +31,10 @@ ai_client = AIClient(config)
 # ImageGenClient uses the same API key — instantiation is safe to do at module
 # level; it only creates an aiohttp session lazily on first use.
 try:
-    image_client = ImageGenClient(config.get("hackclub_api_key", ""))
+    image_client = ImageGenClient(
+        api_key=config.get("hackclub_api_key", ""),
+        image_style=config.get("personality", {}).get("image_style", ""),
+    )
 except ValueError:
     image_client = None
     log.warning("Image generation disabled: hackclub_api_key not set.")
