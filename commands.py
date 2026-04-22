@@ -15,6 +15,7 @@ from discord import app_commands
 if TYPE_CHECKING:
     from state import BotState
     from gork_logger import GorkLogger
+    from image_gen import ImageGenClient
 
 log = logging.getLogger("gork.commands")
 
@@ -42,6 +43,7 @@ def register_commands(
     state: "BotState",
     gork_log: "GorkLogger",
     config: dict,
+    image_client: "ImageGenClient | None" = None,
 ) -> None:
     """
     Register all slash commands onto the bot's command tree.
@@ -244,6 +246,7 @@ def register_commands(
             name="⚙️  Commands",
             value=(
                 "`/gork-help` — Show this menu\n"
+                "`/imagine <prompt>` — Generate an AI image\n"
             ),
             inline=False,
         )
@@ -306,6 +309,10 @@ def register_commands(
         )
 
 
+    # ══ /imagine ══════════════════════════════════════════════════════════════
+    if image_client is not None:
+        _add_imagine_command(tree, image_client, gork_log)
+
 # ── Shared denial helper ──────────────────────────────────────────────────────
 
 async def _deny(
@@ -324,3 +331,59 @@ async def _deny(
         user=f"{interaction.user} ({interaction.user.id})",
         guild=str(interaction.guild),
     )
+
+
+# ── Image gen import (here to avoid circular imports at module level) ─────────
+# Imported inside register_commands so the ImageGenClient is only instantiated
+# when the bot actually starts, not at import time.
+
+def _add_imagine_command(
+    tree: app_commands.CommandTree,
+    image_client: "ImageGenClient",
+    gork_log: "GorkLogger",
+) -> None:
+    """Register /imagine onto the command tree."""
+
+    @tree.command(
+        name="imagine",
+        description="Generate an image from a text prompt.",
+    )
+    @app_commands.describe(prompt="Describe the image you want Gork to generate.")
+    async def imagine(interaction: discord.Interaction, prompt: str) -> None:
+        # Defer immediately — image gen can take 10–30 seconds
+        await interaction.response.defer()
+
+        await gork_log.info(
+            "Image generation requested",
+            user=f"{interaction.user} ({interaction.user.id})",
+            channel=f"#{interaction.channel.name}" if hasattr(interaction.channel, 'name') else "DM",
+            prompt=prompt[:200],
+        )
+
+        try:
+            image_bytes = await image_client.generate(prompt)
+        except RuntimeError as exc:
+            await interaction.followup.send(
+                f"⚠️ Couldn't generate that image: {exc}"
+            )
+            await gork_log.error(
+                "Image generation failed",
+                exc=exc,
+                user=f"{interaction.user} ({interaction.user.id})",
+                prompt=prompt[:200],
+            )
+            return
+
+        file = discord.File(
+            fp=__import__("io").BytesIO(image_bytes),
+            filename="gork_image.png",
+        )
+        await interaction.followup.send(
+            content=f'🎨 **"{prompt}"**',
+            file=file,
+        )
+        await gork_log.success(
+            "Image generated",
+            user=f"{interaction.user} ({interaction.user.id})",
+            prompt=prompt[:200],
+        )

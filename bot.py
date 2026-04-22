@@ -9,6 +9,7 @@ import discord
 from discord.ext import commands
 
 from ai import AIClient
+from image_gen import ImageGenClient
 from commands import register_commands
 from config_loader import load_config
 from gork_logger import GorkLogger
@@ -26,6 +27,14 @@ log = logging.getLogger("gork")
 config    = load_config()
 state     = BotState()
 ai_client = AIClient(config)
+
+# ImageGenClient uses the same API key — instantiation is safe to do at module
+# level; it only creates an aiohttp session lazily on first use.
+try:
+    image_client = ImageGenClient(config.get("hackclub_api_key", ""))
+except ValueError:
+    image_client = None
+    log.warning("Image generation disabled: hackclub_api_key not set.")
 
 # ── Discord client ────────────────────────────────────────────────────────────
 intents = discord.Intents.default()
@@ -50,7 +59,7 @@ async def on_ready() -> None:
 
     # on_ready can fire multiple times on reconnect — only register once
     if not _commands_registered:
-        register_commands(bot, state, gork_log, config)
+        register_commands(bot, state, gork_log, config, image_client)
         _commands_registered = True
 
     # Sync slash commands.
