@@ -13,8 +13,8 @@ import aiohttp
 log = logging.getLogger("gork.ai")
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-HACKCLUB_API_URL = "https://ai.hackclub.com/chat/completions"
-MODEL = "google/gemini-flash-1.5"          # Hack Club proxy model
+HACKCLUB_API_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
+MODEL = "qwen/qwen3-32b"                   # Default Hack Club proxy model
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
 
 
@@ -31,18 +31,28 @@ class AIClient:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self._personality: dict[str, Any] = config.get("personality", {})
-        self._api_key: str = config.get("hackclub_api_key", "")
         self._model: str = config.get("model", MODEL)
         self._session: aiohttp.ClientSession | None = None
+
+        # API key is required — get one at https://ai.hackclub.com/dashboard
+        api_key: str = config.get("hackclub_api_key", "")
+        if not api_key:
+            raise ValueError(
+                "hackclub_api_key is missing from config.json. "
+                "Create a key at https://ai.hackclub.com/dashboard"
+            )
+        self._api_key = api_key
 
     # ── Session management ────────────────────────────────────────────────────
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Return (or lazily create) the shared aiohttp session."""
         if self._session is None or self._session.closed:
-            headers: dict[str, str] = {"Content-Type": "application/json"}
-            if self._api_key:
-                headers["Authorization"] = f"Bearer {self._api_key}"
+            # Authorization is required for all Hack Club AI requests
+            headers: dict[str, str] = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._api_key}",
+            }
             self._session = aiohttp.ClientSession(
                 headers=headers,
                 timeout=REQUEST_TIMEOUT,
