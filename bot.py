@@ -40,14 +40,18 @@ gork_log: GorkLogger | None = None
 
 # ── Events ────────────────────────────────────────────────────────────────────
 
+_commands_registered = False
+
 @bot.event
 async def on_ready() -> None:
     """Fires once connected. Wires logger, registers commands, syncs tree."""
-    global gork_log
+    global gork_log, _commands_registered
     gork_log = GorkLogger(bot, state)
 
-    # Register slash commands onto the tree
-    register_commands(bot, state, gork_log, config)
+    # on_ready can fire multiple times on reconnect — only register once
+    if not _commands_registered:
+        register_commands(bot, state, gork_log, config)
+        _commands_registered = True
 
     # Sync slash commands.
     # If 'sync_guild_id' is set in config, sync to that guild instantly (dev mode).
@@ -116,18 +120,31 @@ async def on_message(message: discord.Message) -> None:
 
     # ── Trigger detection ─────────────────────────────────────────────────────
     user_text: str | None = None
+    trigger_type: str | None = None
 
     if bot.user in message.mentions:
         user_text = extract_user_message(message.content, bot.user.id)
+        trigger_type = "mention"
         log.info(f"Direct mention from {message.author} -> '{user_text}'")
 
     elif is_triggered_by_reply(message, bot.user.id):
         user_text = message.content.strip()
+        trigger_type = "reply"
         log.info(f"Reply-trigger from {message.author} -> '{user_text}'")
 
     if not user_text:
         await bot.process_commands(message)
         return
+
+    # ── Log the interaction ───────────────────────────────────────────────────
+    if gork_log:
+        await gork_log.info(
+            "Message received",
+            user=f"{message.author} ({message.author.id})",
+            channel=f"#{message.channel.name}",
+            trigger=trigger_type,
+            message=user_text[:200] + ("..." if len(user_text) > 200 else ""),
+        )
 
     # ── Generate & send response ──────────────────────────────────────────────
     async with message.channel.typing():

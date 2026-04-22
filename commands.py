@@ -62,7 +62,6 @@ def register_commands(
     add_group = app_commands.Group(
         name="add",
         description="Add a user or channel to the blacklist.",
-        parent=blacklist_group,
     )
 
     @add_group.command(name="user", description="Blacklist a user from interacting with Gork.")
@@ -122,7 +121,6 @@ def register_commands(
     remove_group = app_commands.Group(
         name="remove",
         description="Remove a user or channel from the blacklist.",
-        parent=blacklist_group,
     )
 
     @remove_group.command(name="user", description="Remove a user from the blacklist.")
