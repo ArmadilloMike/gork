@@ -1,7 +1,11 @@
 """
 image_gen.py — Hack Club AI Image Generation
-Isolated module for generating images via the Hack Club AI proxy.
-Returns raw bytes so the caller can send them however it likes.
+Uses the chat completions endpoint with google/gemini-2.5-flash-image
+(the only image model allowed by the Hack Club proxy).
+
+NOTE: The `modalities` parameter is NOT supported through the Hack Club
+proxy — it causes a 404. The model itself handles image output natively
+when addressed with an image-generation prompt.
 """
 
 from __future__ import annotations
@@ -14,9 +18,9 @@ import aiohttp
 
 log = logging.getLogger("gork.image_gen")
 
-IMAGE_API_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
-IMAGE_MODEL   = "google/gemini-2.5-flash-image-preview"
-REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60)  # image gen is slow
+IMAGE_API_URL   = "https://ai.hackclub.com/proxy/v1/chat/completions"
+IMAGE_MODEL     = "google/gemini-2.5-flash-image"   # only allowed image model
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=90)    # image gen can be slow
 
 
 class ImageGenClient:
@@ -59,16 +63,16 @@ class ImageGenClient:
         Raises:
             RuntimeError: On API error or if no image is returned.
         """
+        # Do NOT send `modalities` — the Hack Club proxy rejects it with 404.
+        # The gemini-2.5-flash-image model generates images natively.
         payload: dict[str, Any] = {
             "model": IMAGE_MODEL,
             "messages": [
                 {"role": "user", "content": prompt}
             ],
-            "modalities": ["image", "text"],
-            "stream": False,
         }
 
-        log.info(f"Requesting image generation | prompt='{prompt[:80]}...'")
+        log.info(f"Requesting image | model={IMAGE_MODEL} prompt='{prompt[:80]}'")
         session = await self._get_session()
 
         try:
@@ -76,39 +80,68 @@ class ImageGenClient:
                 if resp.status != 200:
                     body = await resp.text()
                     raise RuntimeError(
-                        f"Image API returned HTTP {resp.status}: {body[:300]}"
+                        f"Image API returned HTTP {resp.status}: {body[:400]}"
                     )
                 data: dict[str, Any] = await resp.json()
         except aiohttp.ClientError as exc:
             raise RuntimeError(f"Network error during image gen: {exc}") from exc
+
+        # Log the raw response keys to help debug if parsing fails
+        log.debug(f"Image API response keys: {list(data.get('choices', [{}])[0].get('message', {}).keys())}")
 
         return self._extract_image_bytes(data)
 
     @staticmethod
     def _extract_image_bytes(data: dict[str, Any]) -> bytes:
         """
-        Pull the base64 image out of the API response and decode it.
+        Extract image bytes from the API response.
 
-        Expected shape:
-          choices[0].message.images[0].image_url.url = "data:image/png;base64,..."
+        Tries three known response shapes in order:
+
+        Shape A — dedicated "images" array:
+          message.images[0].image_url.url = "data:image/png;base64,..."
+
+        Shape B — inline content array with image_url blocks:
+          message.content = [{"type": "image_url", "image_url": {"url": "..."}}]
+
+        Shape C — content array with inline_data blocks (Gemini native format):
+          message.content = [{"type": "image", "inline_data": {"data": "<base64>", "mime_type": "image/png"}}]
         """
         try:
             message = data["choices"][0]["message"]
-            images  = message.get("images", [])
 
-            if not images:
-                raise RuntimeError(
-                    "No images in API response. The model may have refused "
-                    "the prompt or returned text only."
-                )
+            # ── Shape A ───────────────────────────────────────────────────────
+            images = message.get("images") or []
+            if images:
+                url: str = images[0]["image_url"]["url"]
+                if "," in url:
+                    url = url.split(",", 1)[1]
+                return base64.b64decode(url)
 
-            url: str = images[0]["image_url"]["url"]
+            # ── Shapes B & C (inline content array) ───────────────────────────
+            content = message.get("content") or []
+            if isinstance(content, list):
+                for block in content:
+                    btype = block.get("type", "")
 
-            # Strip the data URI prefix if present: "data:image/png;base64,<data>"
-            if "," in url:
-                url = url.split(",", 1)[1]
+                    # Shape B — image_url block
+                    if btype == "image_url":
+                        url = block["image_url"]["url"]
+                        if "," in url:
+                            url = url.split(",", 1)[1]
+                        return base64.b64decode(url)
 
-            return base64.b64decode(url)
+                    # Shape C — inline_data block (raw Gemini format)
+                    if btype == "image" and "inline_data" in block:
+                        return base64.b64decode(block["inline_data"]["data"])
+
+            # Nothing found — log the full response to help diagnose
+            log.error(f"Could not find image in response. Full response: {data}")
+            raise RuntimeError(
+                "No image found in API response. "
+                "The model may have refused the prompt, or the response format has changed. "
+                "Check bot logs for the full response."
+            )
 
         except (KeyError, IndexError, TypeError) as exc:
             log.error(f"Unexpected image response shape: {data}")

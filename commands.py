@@ -6,6 +6,7 @@ All commands are permission-gated to the 'gork-manager' role.
 
 from __future__ import annotations
 
+import io
 import logging
 from typing import TYPE_CHECKING
 
@@ -375,7 +376,7 @@ def _add_imagine_command(
             return
 
         file = discord.File(
-            fp=__import__("io").BytesIO(image_bytes),
+            fp=io.BytesIO(image_bytes),
             filename="gork_image.png",
         )
         await interaction.followup.send(
