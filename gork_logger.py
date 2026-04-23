@@ -13,6 +13,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 import discord
+from discord.ext import commands
 
 if TYPE_CHECKING:
     from state import BotState
@@ -27,6 +28,7 @@ class LogLevel(Enum):
     ERROR     = ("❌",  discord.Color.red())
     MOD       = ("🔨",  discord.Color.orange())
     BLACKLIST = ("🚫",  discord.Color.dark_red())
+    WHITELIST = ("✅",  discord.Color.dark_green())
     SECURITY  = ("🔒",  discord.Color.dark_gold())
 
 
@@ -71,6 +73,12 @@ class GorkLogger:
     async def blacklist(self, title: str, **fields: str) -> None:
         await self._emit(LogLevel.BLACKLIST, title, **fields)
 
+    async def whitelist(self, title: str, **fields: str) -> None:
+        await self._emit(LogLevel.WHITELIST, title, **fields)
+
+    async def memory(self, title: str, **fields: str) -> None:
+        await self._emit(LogLevel.MOD, title, **fields)
+
     async def security(self, title: str, **fields: str) -> None:
         """Permission failures and unauthorized access attempts."""
         await self._emit(LogLevel.SECURITY, title, **fields)
@@ -106,8 +114,13 @@ class GorkLogger:
             return
 
         embed = self._build_embed(level, title, fields)
+        jump_url = fields.pop("jump_url", None)
+        view = None
+        if jump_url:
+            view = discord.ui.View()
+            view.add_item(discord.ui.Button(label="Jump to Message", url=jump_url))
         try:
-            await channel.send(embed=embed)
+            await channel.send(embed=embed, view=view)
         except discord.Forbidden:
             log.warning(f"Missing permission to send to log channel {channel_id}.")
         except discord.HTTPException as exc:

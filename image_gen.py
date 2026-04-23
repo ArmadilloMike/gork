@@ -74,6 +74,10 @@ class ImageGenClient:
         else:
             full_prompt = prompt
 
+        # Add safety filter to prevent NSFW content
+        safety_prefix = "Generate a SFW image that is appropriate for all ages. Avoid any NSFW, violent, explicit, or inappropriate content. "
+        full_prompt = safety_prefix + full_prompt
+
         payload: dict[str, Any] = {
             "model": IMAGE_MODEL,
             "messages": [

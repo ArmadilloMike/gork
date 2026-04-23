@@ -18,6 +18,9 @@ STATE_PATH = Path(__file__).parent / "data" / "state.json"
 _DEFAULT_STATE: dict[str, Any] = {
     "blacklisted_users": [],     # list[int]  — Discord user IDs
     "blacklisted_channels": [],  # list[int]  — Discord channel IDs
+    "whitelisted_channels": [],  # list[int]  — Discord channel IDs
+    "user_memories": {},         # dict[int, dict[str, str]] — User memories
+    "bot_enabled": True,         # bool — Whether Gork responds to messages
     "log_channel_id": None,      # int | None — Discord channel ID
 }
 
@@ -128,6 +131,32 @@ class BotState:
     def blacklisted_channels(self) -> list[int]:
         return list(self._data["blacklisted_channels"])
 
+    # ── Whitelist: channels ───────────────────────────────────────────────────
+
+    def whitelist_channel(self, channel_id: int) -> bool:
+        """Add channel_id to whitelist. Returns True if added, False if already present."""
+        if channel_id in self._data["whitelisted_channels"]:
+            return False
+        self._data["whitelisted_channels"].append(channel_id)
+        self._save()
+        return True
+
+    def unwhitelist_channel(self, channel_id: int) -> bool:
+        """Remove channel_id from whitelist. Returns True if removed, False if not found."""
+        try:
+            self._data["whitelisted_channels"].remove(channel_id)
+        except ValueError:
+            return False
+        self._save()
+        return True
+
+    def is_channel_whitelisted(self, channel_id: int) -> bool:
+        return channel_id in self._data["whitelisted_channels"]
+
+    @property
+    def whitelisted_channels(self) -> list[int]:
+        return list(self._data["whitelisted_channels"])
+
     # ── Log channel ───────────────────────────────────────────────────────────
 
     def set_log_channel(self, channel_id: int) -> None:
@@ -137,3 +166,43 @@ class BotState:
     @property
     def log_channel_id(self) -> int | None:
         return self._data.get("log_channel_id")
+
+    # ── User memories ────────────────────────────────────────────────────────────
+
+    def set_user_memory(self, user_id: int, key: str, value: str) -> None:
+        """Set a memory key-value pair for a user."""
+        if str(user_id) not in self._data["user_memories"]:
+            self._data["user_memories"][str(user_id)] = {}
+        self._data["user_memories"][str(user_id)][key] = value
+        self._save()
+
+    def get_user_memory(self, user_id: int, key: str) -> str | None:
+        """Get a memory value for a user by key."""
+        user_mem = self._data["user_memories"].get(str(user_id), {})
+        return user_mem.get(key)
+
+    def get_user_memories(self, user_id: int) -> dict[str, str]:
+        """Get all memories for a user."""
+        return dict(self._data["user_memories"].get(str(user_id), {}))
+
+    def delete_user_memory(self, user_id: int, key: str) -> bool:
+        """Delete a memory key for a user. Returns True if deleted."""
+        user_mem = self._data["user_memories"].get(str(user_id))
+        if user_mem and key in user_mem:
+            del user_mem[key]
+            if not user_mem:
+                del self._data["user_memories"][str(user_id)]
+            self._save()
+            return True
+        return False
+
+    # ── Bot enabled ────────────────────────────────────────────────────────────
+
+    def set_bot_enabled(self, enabled: bool) -> None:
+        """Enable or disable the bot globally."""
+        self._data["bot_enabled"] = enabled
+        self._save()
+
+    @property
+    def bot_enabled(self) -> bool:
+        return self._data.get("bot_enabled", True)

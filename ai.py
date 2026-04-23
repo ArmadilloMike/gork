@@ -108,22 +108,32 @@ class AIClient:
         return "\n".join(lines)
 
     def _build_messages(
-        self, user_message: str, author_name: str
+        self, user_message: str, author_name: str, context: list[str] | None = None, memories: dict[str, str] | None = None
     ) -> list[dict[str, str]]:
         """Return the full messages list for the API call."""
         system_prompt = self._build_system_prompt()
+        messages = [{"role": "system", "content": system_prompt}]
+
+        if memories:
+            mem_lines = [f"- {k}: {v}" for k, v in memories.items()]
+            messages.append({"role": "system", "content": f"## User Memories\n" + "\n".join(mem_lines) + "\n\n"})
+
+        if context:
+            # Add context messages as a system message or user messages
+            context_text = "\n".join(context)
+            messages.append({"role": "system", "content": f"## Recent Conversation Context\n{context_text}\n\n"})
+
         user_prompt = (
             f"[Responding to Discord user '{author_name}']\n\n{user_message}"
         )
-        return [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages.append({"role": "user", "content": user_prompt})
+
+        return messages
 
     # ── API call ──────────────────────────────────────────────────────────────
 
     async def generate_response(
-        self, user_message: str, author_name: str = "User"
+        self, user_message: str, author_name: str = "User", context: list[str] | None = None, memories: dict[str, str] | None = None
     ) -> str:
         """
         Send a prompt to the Hack Club AI proxy and return the text reply.
@@ -131,6 +141,8 @@ class AIClient:
         Args:
             user_message: The cleaned message from the Discord user.
             author_name:  Display name of the Discord user (for context).
+            context: List of recent messages in the format "Author: Message".
+            memories: Dict of user memories as key-value pairs.
 
         Returns:
             The AI-generated response as a plain string.
@@ -138,7 +150,7 @@ class AIClient:
         Raises:
             RuntimeError: On non-200 HTTP status or malformed response.
         """
-        messages = self._build_messages(user_message, author_name)
+        messages = self._build_messages(user_message, author_name, context, memories)
         payload: dict[str, Any] = {
             "model": self._model,
             "messages": messages,

@@ -3,6 +3,7 @@ bot.py — Gork Discord Bot
 Entry point: Discord events, blacklist enforcement, and slash command sync.
 """
 
+import datetime
 import logging
 
 import discord
@@ -82,7 +83,7 @@ async def on_ready() -> None:
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening,
-            name="@gork mentions",
+            name="dont be horny",
         )
     )
     await gork_log.info(
@@ -113,6 +114,14 @@ async def on_message(message: discord.Message) -> None:
     if state.is_channel_blacklisted(message.channel.id):
         return
 
+    # ── Whitelist: channel ────────────────────────────────────────────────────
+    if state.whitelisted_channels and not state.is_channel_whitelisted(message.channel.id):
+        return
+
+    # ── Bot enabled ────────────────────────────────────────────────────────────
+    if not state.bot_enabled:
+        return
+
     # ── Blacklist: user ───────────────────────────────────────────────────────
     if state.is_user_blacklisted(message.author.id):
         # Only log when the blacklisted user actually tried to trigger Gork,
@@ -127,6 +136,7 @@ async def on_message(message: discord.Message) -> None:
                 user=f"{message.author} ({message.author.id})",
                 channel=f"#{message.channel.name} ({message.channel.id})",
                 content=message.content[:200],
+                jump_url=f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}",
             )
         return
 
@@ -142,6 +152,13 @@ async def on_message(message: discord.Message) -> None:
     elif is_triggered_by_reply(message, bot.user.id):
         user_text = message.content.strip()
         trigger_type = "reply"
+        # Include context of the replied message
+        if message.reference and message.reference.message_id:
+            try:
+                referenced = await message.channel.fetch_message(message.reference.message_id)
+                user_text = f"Replying to: {referenced.content}\n\n{user_text}"
+            except Exception as e:
+                log.warning(f"Failed to fetch referenced message: {e}")
         log.info(f"Reply-trigger from {message.author} -> '{user_text}'")
 
     if not user_text:
@@ -150,20 +167,45 @@ async def on_message(message: discord.Message) -> None:
 
     # ── Log the interaction ───────────────────────────────────────────────────
     if gork_log:
+        jump_url = f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}"
         await gork_log.info(
             "Message received",
             user=f"{message.author} ({message.author.id})",
             channel=f"#{message.channel.name}",
             trigger=trigger_type,
             message=user_text[:200] + ("..." if len(user_text) > 200 else ""),
+            jump_url=jump_url,
         )
 
     # ── Generate & send response ──────────────────────────────────────────────
     async with message.channel.typing():
+        # Fetch recent messages for context
+        context_limit = config.get("context_message_limit", 5)
+        context = []
+        try:
+            async for msg in message.channel.history(limit=context_limit, before=message):
+                # Skip bot messages to avoid self-reference loops
+                if msg.author.bot:
+                    continue
+                # Format as "Author: Message"
+                context.append(f"{msg.author.display_name}: {msg.content}")
+            # Reverse to oldest first
+            context.reverse()
+        except Exception as e:
+            log.warning(f"Failed to fetch message history: {e}")
+            context = None
+
+        # Fetch user memories
+        memories = state.get_user_memories(message.author.id)
+        if not memories:
+            memories = None
+
         try:
             response = await ai_client.generate_response(
                 user_message=user_text,
                 author_name=str(message.author.display_name),
+                context=context,
+                memories=memories,
             )
         except Exception as exc:
             log.exception("AI generation failed")
@@ -174,6 +216,7 @@ async def on_message(message: discord.Message) -> None:
                     user=f"{message.author} ({message.author.id})",
                     channel=f"#{message.channel.name}",
                     input=user_text[:200],
+                    jump_url=f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}",
                 )
             await message.reply("Something went wrong while thinking. Try again in a moment.")
             return
@@ -184,6 +227,22 @@ async def on_message(message: discord.Message) -> None:
             await message.reply(chunk)
         else:
             await message.channel.send(chunk)
+
+    # Update user memories based on interaction
+    user_id = message.author.id
+    # Increment interaction count
+    count = int(state.get_user_memory(user_id, "interaction_count") or "0")
+    state.set_user_memory(user_id, "interaction_count", str(count + 1))
+    # Set last interaction
+    state.set_user_memory(user_id, "last_interaction", datetime.datetime.now().isoformat())
+    # Basic sentiment analysis
+    lower_text = user_text.lower()
+    if any(word in lower_text for word in ["thank", "thanks", "appreciate", "good job", "well done"]):
+        state.set_user_memory(user_id, "attitude", "grateful")
+    elif any(word in lower_text for word in ["stupid", "dumb", "idiot", "bad", "hate"]):
+        state.set_user_memory(user_id, "attitude", "critical")
+    elif any(word in lower_text for word in ["love", "awesome", "great", "amazing"]):
+        state.set_user_memory(user_id, "attitude", "positive")
 
     await bot.process_commands(message)
 
