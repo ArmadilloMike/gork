@@ -26,7 +26,7 @@ def extract_user_message(content: str, bot_user_id: int) -> str:
     """
     # Remove all forms of the bot mention
     pattern = rf"<@!?{re.escape(str(bot_user_id))}>"
-    cleaned = re.sub(pattern, "", content).strip()
+    cleaned = re.sub(pattern, "@gork", content).strip()
     return cleaned
 
 
