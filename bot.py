@@ -178,6 +178,7 @@ async def on_message(message: discord.Message) -> None:
         )
 
     # ── Generate & send response ──────────────────────────────────────────────
+    thinking_msg = await message.reply("i am thinking now.")
     async with message.channel.typing():
         # Fetch recent messages for context
         context_limit = config.get("context_message_limit", 5)
@@ -216,15 +217,15 @@ async def on_message(message: discord.Message) -> None:
                     user=f"{message.author} ({message.author.id})",
                     channel=f"#{message.channel.name}",
                     input=user_text[:200],
-                    jump_url=f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}",
+                    jump_url=f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{thinking_msg.id}",
                 )
-            await message.reply("Something went wrong while thinking. Try again in a moment.")
+            await thinking_msg.edit(content="Something went wrong while thinking. Try again in a moment.")
             return
 
     chunks = split_long_message(response)
     for i, chunk in enumerate(chunks):
         if i == 0:
-            await message.reply(chunk)
+            await thinking_msg.edit(content=chunk)
         else:
             await message.channel.send(chunk)
 
