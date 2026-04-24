@@ -5,6 +5,8 @@ Entry point: Discord events, blacklist enforcement, and slash command sync.
 
 import datetime
 import logging
+import time
+import asyncio
 
 import discord
 from discord.ext import commands
@@ -51,6 +53,44 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 gork_log: GorkLogger | None = None
 
 
+# ── Status change ───────────────────────────────────────────────────────────────
+
+async def generate_status(ai_client: AIClient) -> str:
+    """Generate a new status message using AI."""
+    prompt = "Generate a short, funny status message for a Discord bot named Gork. Keep it under 50 characters. Be sarcastic, lazy, and in character."
+    try:
+        response = await ai_client.chat(prompt, system="You are Gork, a lazy sarcastic bot generating status messages.")
+        return response.strip()[:50]  # Limit to 50 chars
+    except Exception as e:
+        log.error(f"Failed to generate status: {e}")
+        return "being lazy"
+
+
+async def change_status(bot: commands.Bot, state: BotState, ai_client: AIClient, config: dict, custom_status: str | None = None) -> None:
+    """Change the bot's status and update the last change time."""
+    if custom_status:
+        new_status = custom_status
+    else:
+        new_status = await generate_status(ai_client)
+    await bot.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.listening,
+            name=new_status,
+        )
+    )
+    state.set_last_status_change(time.time())
+    log.info(f"Status changed to: {new_status}")
+
+
+async def status_change_loop(bot: commands.Bot, state: BotState, ai_client: AIClient, config: dict) -> None:
+    """Loop that changes status every hour."""
+    while True:
+        await asyncio.sleep(3600)  # 1 hour
+        last_change = state.last_status_change
+        if last_change is None or time.time() - last_change >= 3600:
+            await change_status(bot, state, ai_client, config)
+
+
 # ── Events ────────────────────────────────────────────────────────────────────
 
 _commands_registered = False
@@ -86,11 +126,17 @@ async def on_ready() -> None:
             name="dont be horny",
         )
     )
+    # Set initial last status change if not set
+    if state.last_status_change is None:
+        state.set_last_status_change(time.time())
     await gork_log.info(
         "Gork started",
         user=str(bot.user),
         guilds=str(len(bot.guilds)),
     )
+
+    # Start the status change loop
+    bot.loop.create_task(status_change_loop(bot, state, ai_client, config))
 
 
 @bot.event

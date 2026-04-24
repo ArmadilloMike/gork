@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import logging
+import time
 from typing import TYPE_CHECKING
 
 import discord
@@ -567,6 +568,38 @@ def register_commands(
     # ══ /imagine ══════════════════════════════════════════════════════════════
     if image_client is not None:
         _add_imagine_command(tree, image_client, gork_log)
+
+    # ══ /status ══════════════════════════════════════════════════════════════════
+
+    status_group = app_commands.Group(
+        name="status",
+        description="Manage Gork's status (requires gork-manager role).",
+    )
+
+    @status_group.command(name="set", description="Set Gork's status and reset the timer.")
+    @app_commands.describe(status="The new status message.")
+    async def status_set(interaction: discord.Interaction, status: str) -> None:
+        if not has_manager_role(interaction, role_name):
+            await _deny(interaction, gork_log, "status set")
+            return
+
+        # Change status
+        await bot.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.listening,
+                name=status,
+            )
+        )
+        state.set_last_status_change(time.time())
+        await interaction.response.send_message(f"✅ Status set to: {status}", ephemeral=True)
+        await gork_log.mod(
+            "Status changed",
+            status=status,
+            by=f"{interaction.user} ({interaction.user.id})",
+            guild=str(interaction.guild),
+        )
+
+    tree.add_command(status_group)
 
 # ── Shared denial helper ──────────────────────────────────────────────────────
 

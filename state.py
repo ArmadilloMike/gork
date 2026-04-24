@@ -22,6 +22,7 @@ _DEFAULT_STATE: dict[str, Any] = {
     "user_memories": {},         # dict[int, dict[str, str]] — User memories
     "bot_enabled": True,         # bool — Whether Gork responds to messages
     "log_channel_id": None,      # int | None — Discord channel ID
+    "last_status_change": None,  # float | None — timestamp of last status change
 }
 
 
@@ -206,3 +207,14 @@ class BotState:
     @property
     def bot_enabled(self) -> bool:
         return self._data.get("bot_enabled", True)
+
+    # ── Last status change ────────────────────────────────────────────────────────
+
+    def set_last_status_change(self, timestamp: float | None) -> None:
+        """Set the timestamp of the last status change."""
+        self._data["last_status_change"] = timestamp
+        self._save()
+
+    @property
+    def last_status_change(self) -> float | None:
+        return self._data.get("last_status_change")

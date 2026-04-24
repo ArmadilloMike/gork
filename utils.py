@@ -52,7 +52,7 @@ def is_triggered_by_reply(message, bot_user_id: int) -> bool:
 
     # Check if the replied-to message mentions the bot
     mention_pattern = rf"<@!?{re.escape(str(bot_user_id))}>"
-    return bool(re.search(mention_pattern, resolved.content or ""))
+    return bool(re.search(mention_pattern, resolved.content or "@gork"))
 
 
 def split_long_message(text: str, max_len: int = DISCORD_MAX_CHARS) -> list[str]:
