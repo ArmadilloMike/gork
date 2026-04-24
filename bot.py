@@ -244,7 +244,8 @@ async def on_message(message: discord.Message) -> None:
         # Extract images from message
         images = await extract_images_from_message(message)
         if images:
-            log.info(f"Extracted {len(images)} image(s) from message")
+            log.info(f"Extracted {len(images)} image(s) from message (note: image input not currently supported by Hack Club AI proxy)")
+        
         
         # Fetch recent messages for context
         context_limit = config.get("context_message_limit", 5)

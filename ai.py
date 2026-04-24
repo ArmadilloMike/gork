@@ -139,17 +139,20 @@ class AIClient:
         )
         
         # Build user message content
+        # Note: qwen/qwen3-32b and most current Hack Club AI proxies don't support vision API
+        # so we only include text content for now
         content: list = [{"type": "text", "text": user_prompt}]
         
-        # Add images in vision API format if provided
-        if images:
-            for image_info in images:
-                content.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{image_info['mime_type']};base64,{image_info['base64']}",
-                    },
-                })
+        # Images are not currently supported by the Hack Club AI proxy model
+        # If future models support vision, we can conditionally enable this
+        # if images:
+        #     for image_info in images:
+        #         content.append({
+        #             "type": "image_url",
+        #             "image_url": {
+        #                 "url": f"data:{image_info['mime_type']};base64,{image_info['base64']}",
+        #             },
+        #         })
         
         messages.append({"role": "user", "content": content})
         return messages
