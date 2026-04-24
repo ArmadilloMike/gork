@@ -161,17 +161,29 @@ async def on_message(message: discord.Message) -> None:
                 log.warning(f"Failed to fetch referenced message: {e}")
         log.info(f"Reply-trigger from {message.author} -> '{user_text}'")
 
+    elif message.guild is None and not message.content.startswith("!"):
+        user_text = message.content.strip()
+        trigger_type = "dm"
+        log.info(f"DM from {message.author} -> '{user_text}'")
+
     if not user_text:
         await bot.process_commands(message)
         return
 
+    # ── Prepare logging info ───────────────────────────────────────────────────
+    if message.guild:
+        jump_url = f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}"
+        channel_str = f"#{message.channel.name}"
+    else:
+        jump_url = f"https://discord.com/channels/@me/{message.channel.id}/{message.id}"
+        channel_str = "DM"
+
     # ── Log the interaction ───────────────────────────────────────────────────
     if gork_log:
-        jump_url = f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}"
         await gork_log.info(
             "Message received",
             user=f"{message.author} ({message.author.id})",
-            channel=f"#{message.channel.name}",
+            channel=channel_str,
             trigger=trigger_type,
             message=user_text[:200] + ("..." if len(user_text) > 200 else ""),
             jump_url=jump_url,
@@ -211,13 +223,17 @@ async def on_message(message: discord.Message) -> None:
         except Exception as exc:
             log.exception("AI generation failed")
             if gork_log:
+                if message.guild:
+                    jump_url_error = f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{thinking_msg.id}"
+                else:
+                    jump_url_error = f"https://discord.com/channels/@me/{message.channel.id}/{thinking_msg.id}"
                 await gork_log.error(
                     "AI generation failed",
                     exc=exc,
                     user=f"{message.author} ({message.author.id})",
-                    channel=f"#{message.channel.name}",
+                    channel=channel_str,
                     input=user_text[:200],
-                    jump_url=f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{thinking_msg.id}",
+                    jump_url=jump_url_error,
                 )
             await thinking_msg.edit(content="Something went wrong while thinking. Try again in a moment.")
             return

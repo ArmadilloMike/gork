@@ -613,7 +613,7 @@ def _add_imagine_command(
             user=f"{interaction.user} ({interaction.user.id})",
             channel=f"#{interaction.channel.name}" if hasattr(interaction.channel, 'name') else "DM",
             prompt=prompt[:200],
-            jump_url=f"https://discord.com/channels/{interaction.guild.id}/{interaction.channel.id}",
+            jump_url=f"https://discord.com/channels/{interaction.guild.id if interaction.guild else '@me'}/{interaction.channel.id}",
         )
 
         try:
@@ -622,7 +622,7 @@ def _add_imagine_command(
             error_msg = await interaction.followup.send(
                 f"⚠️ Couldn't generate that image: {exc}"
             )
-            jump_url = f"https://discord.com/channels/{interaction.guild.id}/{interaction.channel.id}/{error_msg.id}"
+            jump_url = f"https://discord.com/channels/{interaction.guild.id if interaction.guild else '@me'}/{interaction.channel.id}/{error_msg.id}"
             await gork_log.error(
                 "Image generation failed",
                 exc=exc,
@@ -640,7 +640,7 @@ def _add_imagine_command(
             content=f'🎨 **"{prompt}"**',
             file=file,
         )
-        jump_url = f"https://discord.com/channels/{interaction.guild.id}/{interaction.channel.id}/{output_msg.id}"
+        jump_url = f"https://discord.com/channels/{interaction.guild.id if interaction.guild else '@me'}/{interaction.channel.id}/{output_msg.id}"
         await gork_log.success(
             "Image generated",
             user=f"{interaction.user} ({interaction.user.id})",
