@@ -17,7 +17,7 @@ from commands import register_commands
 from config_loader import load_config
 from gork_logger import GorkLogger
 from state import BotState
-from utils import extract_user_message, is_triggered_by_reply, split_long_message, remove_emojis
+from utils import extract_user_message, is_triggered_by_reply, split_long_message, process_emojis
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -192,26 +192,26 @@ async def on_message(message: discord.Message) -> None:
 
     if bot.user in message.mentions:
         user_text = extract_user_message(message.content, bot.user.id)
-        user_text = remove_emojis(user_text)
+        user_text = process_emojis(user_text)
         trigger_type = "mention"
         log.info(f"Direct mention from {message.author} -> '{user_text}'")
 
     elif is_triggered_by_reply(message, bot.user.id):
         user_text = message.content.strip()
-        user_text = remove_emojis(user_text)
+        user_text = process_emojis(user_text)
         trigger_type = "reply"
         # Include context of the replied message
         if message.reference and message.reference.message_id:
             try:
                 referenced = await message.channel.fetch_message(message.reference.message_id)
-                user_text = f"Replying to: {remove_emojis(referenced.content)}\n\n{user_text}"
+                user_text = f"Replying to: {process_emojis(referenced.content)}\n\n{user_text}"
             except Exception as e:
                 log.warning(f"Failed to fetch referenced message: {e}")
         log.info(f"Reply-trigger from {message.author} -> '{user_text}'")
 
     elif message.guild is None and not message.content.startswith("!"):
         user_text = message.content.strip()
-        user_text = remove_emojis(user_text)
+        user_text = process_emojis(user_text)
         trigger_type = "dm"
         log.info(f"DM from {message.author} -> '{user_text}'")
 
@@ -250,7 +250,7 @@ async def on_message(message: discord.Message) -> None:
                 if msg.author.bot:
                     continue
                 # Format as "Author: Message"
-                context.append(f"{msg.author.display_name}: {remove_emojis(msg.content)}")
+                context.append(f"{msg.author.display_name}: {process_emojis(msg.content)}")
             # Reverse to oldest first
             context.reverse()
         except Exception as e:
