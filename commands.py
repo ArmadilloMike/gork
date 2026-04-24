@@ -498,37 +498,39 @@ def register_commands(
             inline=False,
         )
 
-        # ── Manager-only commands (shown to everyone, marked restricted) ──────
-        embed.add_field(
-            name="🔒  Manager Commands  *(require the **gork-manager** role)*",
-            value=(
-                "`/blacklist add user <user>` — Block a user from interacting with Gork\n"
-                "`/blacklist add channel <channel>` — Block an entire channel\n"
-                "`/blacklist remove user <user>` — Unblock a user\n"
-                "`/blacklist remove channel <channel>` — Unblock a channel\n"
-                "`/blacklist list` — View all blacklisted users and channels\n"
-                "`/whitelist on <channel>` — Whitelist a channel for Gork interactions\n"
-                "`/whitelist off <channel>` — Remove a channel from the whitelist\n"
-                "`/whitelist list` — View all whitelisted channels\n"
-                "`/memory remember <user> <key> <value>` — Remember something about a user\n"
-                "`/memory recall <user> <key>` — Recall a memory about a user\n"
-                "`/memory list <user>` — List all memories for a user\n"
-                "`/memory forget <user> <key>` — Forget a memory about a user\n"
-                "`/gork enable` — Turn Gork on to respond to messages\n"
-                "`/gork disable` — Turn Gork off from responding to messages\n"
-                "`/setlogchannel <channel>` — Set the channel for Gork's structured logs"
-            ),
-            inline=False,
-        )
-
-        # ── Manager status indicator ──────────────────────────────────────────
+        # ── Manager-only commands (only shown to managers) ──────────────────────
         if is_manager:
+            embed.add_field(
+                name="🔒  Manager Commands  *(you have access)*",
+                value=(
+                    "`/blacklist add user <user>` — Block a user from interacting with Gork\n"
+                    "`/blacklist add channel <channel>` — Block an entire channel\n"
+                    "`/blacklist remove user <user>` — Unblock a user\n"
+                    "`/blacklist remove channel <channel>` — Unblock a channel\n"
+                    "`/blacklist list` — View all blacklisted users and channels\n"
+                    "`/whitelist on <channel>` — Whitelist a channel for Gork interactions\n"
+                    "`/whitelist off <channel>` — Remove a channel from the whitelist\n"
+                    "`/whitelist list` — View all whitelisted channels\n"
+                    "`/memory remember <user> <key> <value>` — Remember something about a user\n"
+                    "`/memory recall <user> <key>` — Recall a memory about a user\n"
+                    "`/memory list <user>` — List all memories for a user\n"
+                    "`/memory forget <user> <key>` — Forget a memory about a user\n"
+                    "`/gork enable` — Turn Gork on to respond to messages\n"
+                    "`/gork disable` — Turn Gork off from responding to messages\n"
+                    "`/status set <status>` — Set Gork's status message\n"
+                    "`/setlogchannel <channel>` — Set the channel for Gork's structured logs"
+                ),
+                inline=False,
+            )
+
+            # ── Manager status indicator ──────────────────────────────────────
             embed.add_field(
                 name="\u200b",
                 value="✅  You have the **gork-manager** role.",
                 inline=False,
             )
         else:
+            # ── Non-manager status indicator ──────────────────────────────────
             embed.add_field(
                 name="\u200b",
                 value="ℹ️  You don't have the **gork-manager** role. Ask a server admin.",
