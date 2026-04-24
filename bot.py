@@ -17,7 +17,7 @@ from commands import register_commands
 from config_loader import load_config
 from gork_logger import GorkLogger
 from state import BotState
-from utils import extract_user_message, is_triggered_by_reply, split_long_message, process_emojis
+from utils import extract_user_message, is_triggered_by_reply, split_long_message, process_emojis, extract_images_from_message
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -241,6 +241,11 @@ async def on_message(message: discord.Message) -> None:
     # ── Generate & send response ──────────────────────────────────────────────
     thinking_msg = await message.reply("i am thinking now.")
     async with message.channel.typing():
+        # Extract images from message
+        images = await extract_images_from_message(message)
+        if images:
+            log.info(f"Extracted {len(images)} image(s) from message")
+        
         # Fetch recent messages for context
         context_limit = config.get("context_message_limit", 5)
         context = []
@@ -268,6 +273,7 @@ async def on_message(message: discord.Message) -> None:
                 author_name=str(message.author.display_name),
                 context=context,
                 memories=memories,
+                images=images if images else None,
             )
         except Exception as exc:
             log.exception("AI generation failed")

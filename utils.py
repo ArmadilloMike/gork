@@ -6,10 +6,16 @@ Pure functions; no Discord or AI imports.
 import re
 import logging
 import emoji
+import base64
+import aiohttp
+from io import BytesIO
+from PIL import Image
 
 log = logging.getLogger("gork.utils")
 
 DISCORD_MAX_CHARS = 2000
+SUPPORTED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"}
+MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MB
 
 
 def process_emojis(text: str) -> str:
@@ -17,6 +23,97 @@ def process_emojis(text: str) -> str:
     Convert emojis to text representations like :thumbs_up:.
     """
     return emoji.demojize(text)
+
+
+async def download_image(url: str) -> bytes | None:
+    """
+    Download an image from a URL and return its raw bytes.
+
+    Args:
+        url: The URL to download from.
+
+    Returns:
+        Raw image bytes, or None if download failed.
+    """
+    try:
+        timeout = aiohttp.ClientTimeout(total=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    log.warning(f"Failed to download image: HTTP {resp.status}")
+                    return None
+                content = await resp.read()
+                if len(content) > MAX_IMAGE_SIZE:
+                    log.warning(f"Image too large: {len(content)} bytes")
+                    return None
+                return content
+    except Exception as e:
+        log.warning(f"Error downloading image: {e}")
+        return None
+
+
+def image_to_base64(image_bytes: bytes) -> str | None:
+    """
+    Convert image bytes to base64-encoded string.
+    Also validates that it's a valid image.
+
+    Args:
+        image_bytes: Raw image bytes.
+
+    Returns:
+        Base64-encoded string, or None if invalid image.
+    """
+    try:
+        # Validate it's actually an image
+        Image.open(BytesIO(image_bytes))
+        # Encode to base64
+        return base64.b64encode(image_bytes).decode("utf-8")
+    except Exception as e:
+        log.warning(f"Error processing image: {e}")
+        return None
+
+
+async def extract_images_from_message(message) -> list[dict]:
+    """
+    Extract all images from a Discord message attachment or embeds.
+    Returns a list of dicts with base64 content and detected MIME type.
+
+    Args:
+        message: A discord.Message object.
+
+    Returns:
+        List of dicts with 'base64' and 'mime_type' keys, or empty list.
+    """
+    images = []
+
+    # Check message attachments
+    if message.attachments:
+        for attachment in message.attachments:
+            # Check if it's an image
+            if attachment.content_type and attachment.content_type.startswith("image/"):
+                image_bytes = await download_image(attachment.url)
+                if image_bytes:
+                    base64_str = image_to_base64(image_bytes)
+                    if base64_str:
+                        images.append({
+                            "base64": base64_str,
+                            "mime_type": attachment.content_type,
+                        })
+
+    # Check embeds for images
+    if message.embeds:
+        for embed in message.embeds:
+            if embed.image:
+                image_bytes = await download_image(embed.image.url)
+                if image_bytes:
+                    base64_str = image_to_base64(image_bytes)
+                    if base64_str:
+                        images.append({
+                            "base64": base64_str,
+                            "mime_type": "image/png",  # Default for embeds
+                        })
+
+    return images
 
 
 def extract_user_message(content: str, bot_user_id: int) -> str:

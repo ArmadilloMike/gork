@@ -86,8 +86,45 @@ INFO gork: Gork is online as Gork#1234 (ID: ...)
 |---------|---------|
 | Direct mention | `@gork what is recursion?` |
 | Reply to a Gork message | Reply to any message containing `@gork` |
+| With image | `@gork what's in this image?` (+ attach image) |
 
 Gork **ignores all other messages** — no passive reading.
+
+---
+
+## Image Processing
+
+Gork can now process images! When you include an image in your message, Gork will analyze it and respond accordingly.
+
+### Supported Image Formats
+
+- PNG
+- JPEG/JPG
+- GIF
+- WebP
+
+### How to Use
+
+Simply attach an image to your message when mentioning or replying to Gork:
+
+```
+@gork what's in this image?
+[attach image]
+```
+
+Or reply to a Gork message with an image:
+
+```
+Reply to Gork message
+[attach image]
+what do you think about this?
+```
+
+### Limitations
+
+- Maximum image size: 20 MB
+- Up to 10+ images can be processed per message (model-dependent)
+- The AI will analyze the image and respond in text form
 
 ---
 

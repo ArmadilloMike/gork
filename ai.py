@@ -108,9 +108,20 @@ class AIClient:
         return "\n".join(lines)
 
     def _build_messages(
-        self, user_message: str, author_name: str, context: list[str] | None = None, memories: dict[str, str] | None = None
-    ) -> list[dict[str, str]]:
-        """Return the full messages list for the API call."""
+        self, user_message: str, author_name: str, context: list[str] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None
+    ) -> list[dict]:
+        """Return the full messages list for the API call.
+        
+        Args:
+            user_message: The user's text message.
+            author_name: Display name of the user.
+            context: List of recent messages.
+            memories: User memory dictionary.
+            images: List of dicts with 'base64' and 'mime_type' keys for vision API.
+        
+        Returns:
+            List of message dicts compatible with OpenAI vision API.
+        """
         system_prompt = self._build_system_prompt()
         messages = [{"role": "system", "content": system_prompt}]
 
@@ -126,14 +137,27 @@ class AIClient:
         user_prompt = (
             f"[Responding to Discord user '{author_name}']\n\n{user_message}"
         )
-        messages.append({"role": "user", "content": user_prompt})
-
+        
+        # Build user message content
+        content: list = [{"type": "text", "text": user_prompt}]
+        
+        # Add images in vision API format if provided
+        if images:
+            for image_info in images:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{image_info['mime_type']};base64,{image_info['base64']}",
+                    },
+                })
+        
+        messages.append({"role": "user", "content": content})
         return messages
 
     # ── API call ──────────────────────────────────────────────────────────────
 
     async def generate_response(
-        self, user_message: str, author_name: str = "User", context: list[str] | None = None, memories: dict[str, str] | None = None
+        self, user_message: str, author_name: str = "User", context: list[str] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None
     ) -> str:
         """
         Send a prompt to the Hack Club AI proxy and return the text reply.
@@ -143,6 +167,7 @@ class AIClient:
             author_name:  Display name of the Discord user (for context).
             context: List of recent messages in the format "Author: Message".
             memories: Dict of user memories as key-value pairs.
+            images: List of dicts with 'base64' and 'mime_type' for vision API.
 
         Returns:
             The AI-generated response as a plain string.
@@ -150,7 +175,7 @@ class AIClient:
         Raises:
             RuntimeError: On non-200 HTTP status or malformed response.
         """
-        messages = self._build_messages(user_message, author_name, context, memories)
+        messages = self._build_messages(user_message, author_name, context, memories, images)
         payload: dict[str, Any] = {
             "model": self._model,
             "messages": messages,
@@ -158,7 +183,7 @@ class AIClient:
             "temperature": self._personality.get("temperature", 0.85),
         }
 
-        log.debug(f"Sending request to Hack Club AI | model={self._model}")
+        log.debug(f"Sending request to Hack Club AI | model={self._model}" + (f" | images={len(images)}" if images else ""))
 
         session = await self._get_session()
         try:
