@@ -10,6 +10,7 @@ when addressed with an image-generation prompt.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 from typing import Any
@@ -20,7 +21,7 @@ log = logging.getLogger("gork.image_gen")
 
 IMAGE_API_URL   = "https://ai.hackclub.com/proxy/v1/chat/completions"
 IMAGE_MODEL     = "google/gemini-2.5-flash-image"   # only allowed image model
-REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=90)    # image gen can be slow
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=180)    # image gen can be slow
 
 
 class ImageGenClient:
@@ -86,18 +87,26 @@ class ImageGenClient:
         }
 
         log.info(f"Requesting image | model={IMAGE_MODEL} prompt='{prompt[:80]}'")
-        session = await self._get_session()
-
-        try:
-            async with session.post(IMAGE_API_URL, json=payload) as resp:
-                if resp.status != 200:
-                    body = await resp.text()
-                    raise RuntimeError(
-                        f"Image API returned HTTP {resp.status}: {body[:400]}"
-                    )
-                data: dict[str, Any] = await resp.json()
-        except aiohttp.ClientError as exc:
-            raise RuntimeError(f"Network error during image gen: {exc}") from exc
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                session = await self._get_session()
+                async with session.post(IMAGE_API_URL, json=payload) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        raise RuntimeError(
+                            f"Image API returned HTTP {resp.status}: {body[:400]}"
+                        )
+                    data: dict[str, Any] = await resp.json()
+                break  # success, exit retry loop
+            except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    log.warning(f"Image gen attempt {attempt + 1} failed: {exc}. Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    raise RuntimeError(f"Network error during image gen after {max_retries} attempts: {exc}") from exc
 
         # Log the raw response keys to help debug if parsing fails
         log.debug(f"Image API response keys: {list(data.get('choices', [{}])[0].get('message', {}).keys())}")

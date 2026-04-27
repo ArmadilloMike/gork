@@ -15,7 +15,7 @@ log = logging.getLogger("gork.ai")
 # ── Constants ─────────────────────────────────────────────────────────────────
 HACKCLUB_API_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
 MODEL = "qwen/qwen3-32b"                   # Default Hack Club proxy model
-REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=90)
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=180)
 
 
 class AIClient:
@@ -188,23 +188,30 @@ class AIClient:
 
         log.debug(f"Sending request to Hack Club AI | model={self._model}" + (f" | images={len(images)}" if images else ""))
 
-        session = await self._get_session()
-        try:
-            async with session.post(
-                HACKCLUB_API_URL, json=payload
-            ) as resp:
-                if resp.status != 200:
-                    body = await resp.text()
-                    raise RuntimeError(
-                        f"Hack Club AI returned HTTP {resp.status}: {body[:300]}"
-                    )
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                session = await self._get_session()
+                async with session.post(
+                    HACKCLUB_API_URL, json=payload
+                ) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        raise RuntimeError(
+                            f"Hack Club AI returned HTTP {resp.status}: {body[:300]}"
+                        )
 
-                data: dict[str, Any] = await resp.json()
-                return self._parse_response(data)
+                    data: dict[str, Any] = await resp.json()
+                    return self._parse_response(data)
 
-        except aiohttp.ClientError as exc:
-            log.error(f"Network error contacting Hack Club AI: {exc}")
-            raise RuntimeError(f"Network error: {exc}") from exc
+            except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # exponential backoff: 1, 2, 4 seconds
+                    log.warning(f"Attempt {attempt + 1} failed: {exc}. Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    log.error(f"All {max_retries} attempts failed. Last error: {exc}")
+                    raise RuntimeError(f"Network error after {max_retries} attempts: {exc}") from exc
 
     # ── Response parsing ──────────────────────────────────────────────────────
 
