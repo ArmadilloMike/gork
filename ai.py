@@ -14,7 +14,7 @@ log = logging.getLogger("gork.ai")
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 HACKCLUB_API_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
-MODEL = "qwen/qwen3-32b"                   # Default Hack Club proxy model
+MODEL = "openai/gpt-5.2-pro"                   # Default Hack Club proxy model
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=180)
 
 
