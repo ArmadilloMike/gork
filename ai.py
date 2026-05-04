@@ -32,6 +32,7 @@ class AIClient:
     def __init__(self, config: dict[str, Any]) -> None:
         self._personality: dict[str, Any] = config.get("personality", {})
         self._model: str = config.get("model", MODEL)
+        self._api_url: str = config.get("api_url", HACKCLUB_API_URL)
         self._session: aiohttp.ClientSession | None = None
 
         # API key is required — get one at https://ai.hackclub.com/dashboard
@@ -85,7 +86,7 @@ class AIClient:
 
         try:
             session = await self._get_session()
-            async with session.post(HACKCLUB_API_URL, json=payload) as resp:
+            async with session.post(self._api_url, json=payload) as resp:
                 if resp.status != 200:
                     body = await resp.text()
                     raise RuntimeError(f"AI API error: {body[:300]}")
@@ -114,6 +115,8 @@ class AIClient:
             "You are an intent classifier. Your job is to determine if a user message is asking "
             "to generate, draw, or visualize an image. "
             "If the user is asking for an image, reply ONLY with the extracted image description/prompt. "
+            "Do NOT enhance, expand, or add details to the prompt. Just extract the core description "
+            "of what the user wants to see, using their own words as much as possible. "
             "If the user is NOT asking for an image, reply ONLY with 'NONE'. "
             "Be strict: only trigger if the intent is clearly about creating a new image. "
             "Ignore requests to talk about images, only trigger on requests to CREATE one."
@@ -133,7 +136,7 @@ class AIClient:
             }
             
             session = await self._get_session()
-            async with session.post(HACKCLUB_API_URL, json=payload) as resp:
+            async with session.post(self._api_url, json=payload) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     content = self._parse_response(data)
@@ -220,20 +223,17 @@ class AIClient:
         )
         
         # Build user message content
-        # Note: qwen/qwen3-32b and most current Hack Club AI proxies don't support vision API
-        # so we only include text content for now
         content: list = [{"type": "text", "text": user_prompt}]
         
-        # Images are not currently supported by the Hack Club AI proxy model
-        # If future models support vision, we can conditionally enable this
-        # if images:
-        #     for image_info in images:
-        #         content.append({
-        #             "type": "image_url",
-        #             "image_url": {
-        #                 "url": f"data:{image_info['mime_type']};base64,{image_info['base64']}",
-        #             },
-        #         })
+        # Add images if provided
+        if images:
+            for image_info in images:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{image_info['mime_type']};base64,{image_info['base64']}",
+                    },
+                })
         
         messages.append({"role": "user", "content": content})
         return messages
@@ -274,7 +274,7 @@ class AIClient:
             try:
                 session = await self._get_session()
                 async with session.post(
-                    HACKCLUB_API_URL, json=payload
+                    self._api_url, json=payload
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()

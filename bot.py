@@ -35,10 +35,7 @@ ai_client = AIClient(config)
 # ImageGenClient uses the same API key — instantiation is safe to do at module
 # level; it only creates an aiohttp session lazily on first use.
 try:
-    image_client = ImageGenClient(
-        api_key=config.get("hackclub_api_key", ""),
-        image_style=config.get("personality", {}).get("image_style", ""),
-    )
+    image_client = ImageGenClient(config)
 except ValueError:
     image_client = None
     log.warning("Image generation disabled: hackclub_api_key not set.")
@@ -56,11 +53,12 @@ gork_log: GorkLogger | None = None
 
 # ── Status change ───────────────────────────────────────────────────────────────
 
-async def generate_status(ai_client: AIClient) -> str:
+async def generate_status(ai_client: AIClient, config: dict) -> str:
     """Generate a new status message using AI."""
-    prompt = "Generate a short, funny status message for a Discord bot named Gork. Keep it under 50 characters. Be sarcastic, lazy, and in character."
+    bot_name = config.get("personality", {}).get("name", "Gork")
+    prompt = f"Generate a short, funny status message for a Discord bot named {bot_name}. Keep it under 50 characters. Be sarcastic, lazy, and in character."
     try:
-        response = await ai_client.chat(prompt, system="You are Gork, a lazy sarcastic bot generating status messages.")
+        response = await ai_client.chat(prompt, system=f"You are {bot_name}, a lazy sarcastic bot generating status messages.")
         return response.strip()[:50]  # Limit to 50 chars
     except Exception as e:
         log.error(f"Failed to generate status: {e}")
@@ -72,7 +70,7 @@ async def change_status(bot: commands.Bot, state: BotState, ai_client: AIClient,
     if custom_status:
         new_status = custom_status
     else:
-        new_status = await generate_status(ai_client)
+        new_status = await generate_status(ai_client, config)
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening,
@@ -85,10 +83,11 @@ async def change_status(bot: commands.Bot, state: BotState, ai_client: AIClient,
 
 async def status_change_loop(bot: commands.Bot, state: BotState, ai_client: AIClient, config: dict) -> None:
     """Loop that changes status every hour."""
+    status_interval = config.get("status_change_interval", 3600)
     while True:
-        await asyncio.sleep(3600)  # 1 hour
+        await asyncio.sleep(status_interval)  # default 1 hour
         last_change = state.last_status_change
-        if last_change is None or time.time() - last_change >= 3600:
+        if last_change is None or time.time() - last_change >= status_interval:
             await change_status(bot, state, ai_client, config)
 
 
@@ -124,7 +123,7 @@ async def on_ready() -> None:
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening,
-            name="dont be horny",
+            name=config.get("initial_status", "being lazy"),
         )
     )
     # Set initial last status change if not set
@@ -244,8 +243,9 @@ async def on_message(message: discord.Message) -> None:
 
     # ── Log the interaction ───────────────────────────────────────────────────
     if gork_log:
+        log_title = "imager generation requested" if is_image_request else "Message received"
         await gork_log.info(
-            "Message received",
+            log_title,
             user=f"{message.author} ({message.author.id})",
             channel=channel_str,
             trigger=trigger_type,
@@ -277,7 +277,7 @@ async def on_message(message: discord.Message) -> None:
         # Extract images from message
         images = await extract_images_from_message(message)
         if images:
-            log.info(f"Extracted {len(images)} image(s) from message (note: image input not currently supported by Hack Club AI proxy)")
+            log.info(f"Extracted {len(images)} image(s) from message for multimodal input")
         
         
         # Fetch recent messages for context

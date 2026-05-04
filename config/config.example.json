@@ -5,8 +5,12 @@
   "hackclub_api_key": "YOUR_HACKCLUB_API_KEY",
 
   "model": "google/gemini-flash-1.5",
+  "image_model": "google/gemini-2.5-flash-image",
 
   "manager_role_name": "gork-manager",
+
+  "status_change_interval": 3600,
+  "initial_status": "being lazy",
 
   "_context_message_limit_comment": "Number of recent messages to include as context for AI responses.",
   "context_message_limit": 5,

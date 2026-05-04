@@ -30,11 +30,14 @@ class ImageGenClient:
     Accepts a plain text prompt, returns PNG bytes.
     """
 
-    def __init__(self, api_key: str, image_style: str = "") -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
+        api_key = config.get("hackclub_api_key", "")
         if not api_key:
             raise ValueError("hackclub_api_key is required for image generation.")
         self._api_key = api_key
-        self._image_style = image_style
+        self._image_style = config.get("image_style", "")
+        self._model = config.get("image_model", IMAGE_MODEL)
+        self._api_url = config.get("api_url", IMAGE_API_URL)
         self._session: aiohttp.ClientSession | None = None
 
     async def _get_session(self) -> aiohttp.ClientSession:
@@ -76,23 +79,23 @@ class ImageGenClient:
             full_prompt = prompt
 
         # Add safety filter to prevent NSFW content
-        safety_prefix = "Generate a SFW image that is appropriate for all ages. Avoid any NSFW, violent, explicit, or inappropriate content. "
+        safety_prefix = "Generate a non NSFW image"
         full_prompt = safety_prefix + full_prompt
 
         payload: dict[str, Any] = {
-            "model": IMAGE_MODEL,
+            "model": self._model,
             "messages": [
                 {"role": "user", "content": full_prompt}
             ],
         }
 
-        log.info(f"Requesting image | model={IMAGE_MODEL} prompt='{prompt[:80]}'")
+        log.info(f"Requesting image | model={self._model} prompt='{prompt[:80]}'")
         
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 session = await self._get_session()
-                async with session.post(IMAGE_API_URL, json=payload) as resp:
+                async with session.post(self._api_url, json=payload) as resp:
                     if resp.status != 200:
                         body = await resp.text()
                         raise RuntimeError(
