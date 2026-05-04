@@ -38,8 +38,13 @@ def load_config(path: Path | str | None = None) -> dict[str, Any]:
             "Copy config/config.example.json to config/config.json and fill in your tokens."
         )
 
-    with config_path.open("r", encoding="utf-8") as fh:
-        config: dict[str, Any] = json.load(fh)
+    try:
+        with config_path.open("r", encoding="utf-8") as fh:
+            config: dict[str, Any] = json.load(fh)
+    except UnicodeDecodeError:
+        log.warning(f"Failed to decode '{config_path}' as UTF-8. Retrying with 'latin-1'...")
+        with config_path.open("r", encoding="latin-1") as fh:
+            config = json.load(fh)
 
     log.info(f"Loaded config from '{config_path}'")
     _validate(config)

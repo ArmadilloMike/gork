@@ -37,6 +37,14 @@ def _load_raw() -> dict[str, Any]:
         for key, default in _DEFAULT_STATE.items():
             data.setdefault(key, default)
         return data
+    except UnicodeDecodeError:
+        log.warning(f"Failed to decode '{STATE_PATH}' as UTF-8. Retrying with 'latin-1'...")
+        with STATE_PATH.open("r", encoding="latin-1") as fh:
+            data = json.load(fh)
+        # Backfill any keys added in later versions
+        for key, default in _DEFAULT_STATE.items():
+            data.setdefault(key, default)
+        return data
     except (json.JSONDecodeError, OSError) as exc:
         log.error(f"Could not read state file ({exc}); using defaults.")
         return dict(_DEFAULT_STATE)
