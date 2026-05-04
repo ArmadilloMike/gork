@@ -309,4 +309,4 @@ class AIClient:
             return content.strip()
         except (KeyError, IndexError, TypeError) as exc:
             log.error(f"Unexpected response shape: {data}")
-            raise RuntimeError(f"Could not parse AI response: {exc}") from exc
+            raise RuntimeError(f"Could not parse AI response: {exc}. Full data: {data}") from exc

@@ -243,7 +243,7 @@ async def on_message(message: discord.Message) -> None:
 
     # ── Log the interaction ───────────────────────────────────────────────────
     if gork_log:
-        log_title = "imager generation requested" if is_image_request else "Message received"
+        log_title = "image generation requested" if is_image_request else "Message received"
         await gork_log.info(
             log_title,
             user=f"{message.author} ({message.author.id})",
@@ -345,8 +345,6 @@ async def on_message(message: discord.Message) -> None:
         state.set_user_memory(user_id, "attitude", "critical")
     elif any(word in lower_text for word in ["love", "awesome", "great", "amazing"]):
         state.set_user_memory(user_id, "attitude", "positive")
-
-    await bot.process_commands(message)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
