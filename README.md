@@ -1,14 +1,15 @@
 # Gork — Discord AI Bot
 
 A modular, config-driven Discord bot powered by the Hack Club AI proxy.
-Gork responds only when explicitly summoned — no passive eavesdropping.
+Gork responds when summoned, or when it detects you want to create something.
 
 ---
 
 ## Features
 
 - **AI-Powered Responses**: Uses Hack Club AI proxy for intelligent, personality-driven replies.
-- **Image Generation**: Generate images from text prompts with `/imagine`.
+- **Image Generation**: Generate images from text prompts with `/imagine` or natural language.
+- **Intelligent Intent Detection**: Automatically detects image-generation requests in normal conversation.
 - **Slash Commands**: Full suite of commands for management, blacklisting, whitelisting, and more.
 - **Persistent State**: Blacklists, whitelists, user memories, and settings saved to disk.
 - **Structured Logging**: Console and optional Discord channel logging with embeds.
@@ -113,8 +114,9 @@ INFO gork: Gork is online as Gork#1234 (ID: ...)
 | Direct mention | `@gork what is recursion?` | Works in servers and DMs |
 | Reply to a Gork message | Reply to any message containing `@gork` | Includes context from replied message |
 | DM (no mention needed) | `hello gork` | Direct messages don't require @mention |
+| Implicit Image Request | `draw me a cyberpunk city` | Automatically triggers image generation |
 
-Gork **ignores all other messages** — no passive reading.
+Gork primarily responds when explicitly summoned, but it also listens for natural-language image requests (e.g., "make an image of...", "can you show me...", etc.).
 
 ### Context and Memory
 
@@ -165,19 +167,27 @@ Requires the `gork-manager` role (configurable in config.json).
 
 ## Image Generation
 
-Gork can generate images using the Hack Club AI proxy with Google's Gemini model.
+Gork can generate images using the Hack Club AI proxy. It supports both explicit commands and natural language requests.
 
 ### How to Use
 
+#### 1. Slash Command
 Use the `/imagine <prompt>` command:
-
 ```
 /imagine a cat wearing a spacesuit
 ```
 
+#### 2. Natural Language
+Just ask Gork to create something in a channel where it can see messages:
+- "draw a sunset over a digital ocean"
+- "make me an image of a cybernetic raven"
+- "show me what a futuristic library looks like"
+
+### Details
 - Images are generated asynchronously (may take 10-30 seconds)
 - Output is a PNG file attached to the response
 - The `image_style` from config is applied to all generations
+- Gork uses a typing indicator while generating to show it's working.
 
 ### Limitations
 
@@ -236,16 +246,16 @@ All personality is stored in `config/config.json` under the `"personality"` key.
 
 ### Personality fields
 
-| Field | What it controls |
-|-------|-----------------|
-| `name` | Bot's self-reference name in the system prompt |
-| `description` | Core character backstory & identity |
-| `tone` | Emotional register and voice |
-| `temperature` | Creativity level (0.0 = deterministic, 1.0 = wild) |
-| `style_rules` | List of formatting/writing rules |
-| `behavioral_tendencies` | How Gork acts in different situations |
-| `response_formatting` | Length, structure, markdown usage rules |
-| `image_style` | Style applied to generated images |
+| Field                   | What it controls                                   |
+|-------------------------|----------------------------------------------------|
+| `name`                  | Bot's self-reference name in the system prompt     |
+| `description`           | Core character backstory & identity                |
+| `tone`                  | Emotional register and voice                       |
+| `temperature`           | Creativity level (0.0 = deterministic, 1.0 = wild) |
+| `style_rules`           | List of formatting/writing rules                   |
+| `behavioral_tendencies` | How Gork acts in different situations              |
+| `response_formatting`   | Length, structure, markdown usage rules            |
+| `image_style`           | Style applied to generated images                  |
 
 ### Example: Make Gork cheerful
 
@@ -291,8 +301,8 @@ GORK_CONFIG=/path/to/other-config.json python bot.py
 
 ## Architecture Notes
 
-- **`bot.py`** — Discord events, trigger detection, blacklist/whitelist enforcement, message processing.
-- **`ai.py`** — AI client for text responses, handles prompts and API calls.
+- **`bot.py`** — Discord events, trigger detection (explicit/implicit), blacklist/whitelist enforcement, message processing.
+- **`ai.py`** — AI client for text responses and intent classification.
 - **`commands.py`** — All slash commands, permission checks, command registration.
 - **`config_loader.py`** — Loads and validates JSON config files.
 - **`utils.py`** — Pure functions for message processing, emoji handling, etc.

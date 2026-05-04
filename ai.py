@@ -64,6 +64,87 @@ class AIClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
+    # ── Simple Chat ───────────────────────────────────────────────────────────
+
+    async def chat(self, prompt: str, system: str | None = None) -> str:
+        """
+        Simple chat completion without personality/context overhead.
+        Useful for internal tasks like classification or status generation.
+        """
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "max_tokens": 1024,
+            "temperature": 0.7,
+        }
+
+        try:
+            session = await self._get_session()
+            async with session.post(HACKCLUB_API_URL, json=payload) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise RuntimeError(f"AI API error: {body[:300]}")
+                data: dict[str, Any] = await resp.json()
+                return self._parse_response(data)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            log.error(f"Chat request failed: {exc}")
+            raise RuntimeError(f"Network error during chat: {exc}") from exc
+
+    # ── Image Intent Detection ────────────────────────────────────────────────
+
+    async def detect_image_intent(self, user_message: str) -> str | None:
+        """
+        Analyze a message to see if it's an implicit request for an image.
+        Returns the extracted prompt if it is, otherwise None.
+        """
+        # Quick keyword pre-filter to save API calls
+        keywords = [
+            "draw", "make", "generate", "show", "visualize", "create", 
+            "imagine", "picture", "image", "sketch", "paint", "art"
+        ]
+        if not any(word in user_message.lower() for word in keywords):
+            return None
+
+        system_prompt = (
+            "You are an intent classifier. Your job is to determine if a user message is asking "
+            "to generate, draw, or visualize an image. "
+            "If the user is asking for an image, reply ONLY with the extracted image description/prompt. "
+            "If the user is NOT asking for an image, reply ONLY with 'NONE'. "
+            "Be strict: only trigger if the intent is clearly about creating a new image. "
+            "Ignore requests to talk about images, only trigger on requests to CREATE one."
+        )
+        
+        try:
+            # Use a low temperature for deterministic classification
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
+            payload = {
+                "model": self._model,
+                "messages": messages,
+                "max_tokens": 100,
+                "temperature": 0.0,
+            }
+            
+            session = await self._get_session()
+            async with session.post(HACKCLUB_API_URL, json=payload) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    content = self._parse_response(data)
+                    if content.upper() == "NONE" or not content:
+                        return None
+                    return content
+        except Exception as e:
+            log.warning(f"Failed to detect image intent: {e}")
+            
+        return None
+
     # ── Prompt construction ───────────────────────────────────────────────────
 
     def _build_system_prompt(self) -> str:

@@ -7,6 +7,7 @@ import datetime
 import logging
 import time
 import asyncio
+import io
 
 import discord
 from discord.ext import commands
@@ -215,6 +216,20 @@ async def on_message(message: discord.Message) -> None:
         trigger_type = "dm"
         log.info(f"DM from {message.author} -> '{user_text}'")
 
+    # ── Image Intent Detection (Implicit/Explicit) ────────────────────────────
+    is_image_request = False
+    image_prompt = None
+    if image_client:
+        # Check either the explicitly triggered text or the whole message content if not triggered
+        text_to_analyze = user_text if user_text else message.content
+        image_prompt = await ai_client.detect_image_intent(text_to_analyze)
+
+        if image_prompt:
+            is_image_request = True
+            if not user_text:
+                trigger_type = "implicit_image"
+                user_text = image_prompt  # For logging purposes
+
     if not user_text:
         await bot.process_commands(message)
         return
@@ -239,8 +254,26 @@ async def on_message(message: discord.Message) -> None:
         )
 
     # ── Generate & send response ──────────────────────────────────────────────
-    thinking_msg = await message.reply("i am thinking now.")
     async with message.channel.typing():
+        if is_image_request:
+            try:
+                image_bytes = await image_client.generate(image_prompt)
+                file = discord.File(fp=io.BytesIO(image_bytes), filename="gork_image.png")
+                await message.reply(content=f'🎨 **"{image_prompt}"**', file=file)
+
+                if gork_log:
+                    await gork_log.success(
+                        "Image generated (auto)",
+                        user=f"{message.author} ({message.author.id})",
+                        prompt=image_prompt[:200],
+                        jump_url=jump_url,
+                    )
+                return
+            except Exception as exc:
+                log.exception("Auto image generation failed")
+                await message.reply(f"⚠️ Couldn't generate that image: {exc}")
+                return
+
         # Extract images from message
         images = await extract_images_from_message(message)
         if images:
@@ -279,25 +312,21 @@ async def on_message(message: discord.Message) -> None:
         except Exception as exc:
             log.exception("AI generation failed")
             if gork_log:
-                if message.guild:
-                    jump_url_error = f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{thinking_msg.id}"
-                else:
-                    jump_url_error = f"https://discord.com/channels/@me/{message.channel.id}/{thinking_msg.id}"
                 await gork_log.error(
                     "AI generation failed",
                     exc=exc,
                     user=f"{message.author} ({message.author.id})",
                     channel=channel_str,
                     input=user_text[:200],
-                    jump_url=jump_url_error,
+                    jump_url=jump_url,
                 )
-            await thinking_msg.edit(content="Something went wrong while thinking. Try again in a moment.")
+            await message.reply("Something went wrong while thinking. Try again in a moment.")
             return
 
     chunks = split_long_message(response)
     for i, chunk in enumerate(chunks):
         if i == 0:
-            await thinking_msg.edit(content=chunk)
+            await message.reply(chunk)
         else:
             await message.channel.send(chunk)
 
