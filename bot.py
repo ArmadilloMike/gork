@@ -293,15 +293,19 @@ async def on_message(message: discord.Message) -> None:
         
         
         # Fetch recent messages for context
-        context_limit = config.get("context_message_limit", 5)
+        context_limit = config.get("context_message_limit", 15)
         context = []
         try:
             async for msg in message.channel.history(limit=context_limit, before=message):
-                # Skip bot messages to avoid self-reference loops
-                if msg.author.bot:
-                    continue
-                # Format as "Author: Message"
-                context.append(f"{msg.author.display_name}: {process_emojis(msg.content)}")
+                # Extract images from this context message
+                msg_images = await extract_images_from_message(msg)
+                
+                # Add to context as a structured dict
+                context.append({
+                    "author": msg.author.display_name,
+                    "content": process_emojis(msg.content),
+                    "images": msg_images
+                })
             # Reverse to oldest first
             context.reverse()
         except Exception as e:

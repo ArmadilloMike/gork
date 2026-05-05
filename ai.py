@@ -259,14 +259,14 @@ class AIClient:
         return "\n".join(lines)
 
     def _build_messages(
-        self, user_message: str, author_name: str, context: list[str] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None
+        self, user_message: str, author_name: str, context: list[Any] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None
     ) -> list[dict]:
         """Return the full messages list for the API call.
         
         Args:
             user_message: The user's text message.
             author_name: Display name of the user.
-            context: List of recent messages.
+            context: List of recent messages (strings or dicts with 'author', 'content', 'images').
             memories: User memory dictionary.
             images: List of dicts with 'base64' and 'mime_type' keys for vision API.
         
@@ -281,9 +281,28 @@ class AIClient:
             messages.append({"role": "system", "content": f"## User Memories\n" + "\n".join(mem_lines) + "\n\n"})
 
         if context:
-            # Add context messages as a system message or user messages
-            context_text = "\n".join(context)
-            messages.append({"role": "system", "content": f"## Recent Conversation Context\n{context_text}\n\n"})
+            # Build context content which may include images
+            context_content: list[dict[str, Any]] = [{"type": "text", "text": "## Recent Conversation Context\n"}]
+            
+            for entry in context:
+                if isinstance(entry, str):
+                    context_content.append({"type": "text", "text": f"{entry}\n"})
+                elif isinstance(entry, dict):
+                    author = entry.get("author", "Unknown")
+                    content_text = entry.get("content", "")
+                    context_content.append({"type": "text", "text": f"{author}: {content_text}\n"})
+                    
+                    # Add images from this context message if any
+                    msg_images = entry.get("images", [])
+                    for img in msg_images:
+                        context_content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{img['mime_type']};base64,{img['base64']}",
+                            },
+                        })
+            
+            messages.append({"role": "system", "content": context_content})
 
         user_prompt = (
             f"[Responding to Discord user '{author_name}']\n\n{user_message}"
@@ -308,7 +327,7 @@ class AIClient:
     # ── API call ──────────────────────────────────────────────────────────────
 
     async def generate_response(
-        self, user_message: str, author_name: str = "User", context: list[str] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None
+        self, user_message: str, author_name: str = "User", context: list[Any] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None
     ) -> str:
         """
         Send a prompt to the Hack Club AI proxy and return the text reply.
@@ -316,7 +335,7 @@ class AIClient:
         Args:
             user_message: The cleaned message from the Discord user.
             author_name:  Display name of the Discord user (for context).
-            context: List of recent messages in the format "Author: Message".
+            context: List of recent messages (strings or dicts).
             memories: Dict of user memories as key-value pairs.
             images: List of dicts with 'base64' and 'mime_type' for vision API.
 
