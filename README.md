@@ -108,6 +108,7 @@ gork/
 ├── gork_logger.py      # Structured logging (Console + Discord)
 ├── utils.py            # Helper functions (message parsing, etc.)
 ├── requirements.txt    # Python dependencies
+├── tests/              # Unit tests
 ├── config/
 │   ├── config.example.json   # Configuration template
 │   └── config.json           # Active configuration (gitignored)
@@ -172,6 +173,22 @@ Personality is 100% decoupled from code. Edit `config/config.json` to change Gor
   ```bash
   GORK_CONFIG=prod.json python bot.py
   ```
+
+---
+
+## 🧪 Testing
+
+Gork includes a test suite to ensure everything is working correctly.
+
+### Running Tests
+1. Install testing dependencies:
+   ```bash
+   pip install pytest pytest-asyncio
+   ```
+2. Run all tests:
+   ```bash
+   pytest
+   ```
 
 ---
 
