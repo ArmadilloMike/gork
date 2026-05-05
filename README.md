@@ -136,6 +136,7 @@ gork/
 | `/imagine <prompt>` | Generate an AI image | Public |
 | `/gork help` | Show help menu | Public |
 | `/status set <text>` | Update bot status message | Manager |
+| `/status refresh` | Prompt Gork to generate a new status immediately | Manager |
 | `/blacklist add <user/channel>` | Block interaction | Manager |
 | `/blacklist remove <user/channel>` | Unblock interaction | Manager |
 | `/blacklist list` | Show all blocks | Manager |

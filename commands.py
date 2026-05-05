@@ -610,6 +610,7 @@ def register_commands(
                     "`/gork enable` — Turn Gork on to respond to messages\n"
                     "`/gork disable` — Turn Gork off from responding to messages\n"
                     "`/status set <status>` — Set Gork's status message\n"
+                    "`/status refresh` — Prompt Gork to generate a new status immediately\n"
                     "`/setlogchannel <channel>` — Set the channel for Gork's structured logs"
                 ),
                 inline=False,
@@ -678,14 +679,11 @@ def register_commands(
             await _deny(interaction, gork_log, "status set")
             return
 
-        # Change status
-        await bot.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.listening,
-                name=status,
-            )
-        )
-        state.set_last_status_change(time.time())
+        from bot import change_status
+
+        # Change status using the shared helper
+        await change_status(bot, state, ai_client, config, custom_status=status)
+        
         await interaction.response.send_message(f"✅ Status set to: {status}", ephemeral=True)
         await gork_log.mod(
             "Status changed",
@@ -694,6 +692,36 @@ def register_commands(
             by=f"{interaction.user} ({interaction.user.id})",
             guild=str(interaction.guild),
         )
+
+    @status_group.command(name="refresh", description="Prompt Gork to generate a new status immediately.")
+    async def status_refresh(interaction: discord.Interaction) -> None:
+        if not has_manager_role(interaction, role_name):
+            await _deny(interaction, gork_log, "status refresh")
+            return
+
+        from bot import change_status
+
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            new_status = await change_status(bot, state, ai_client, config)
+            
+            await interaction.followup.send(f"✅ Gork has refreshed his status to: **{new_status}**", ephemeral=True)
+            await gork_log.mod(
+                "Status refreshed",
+                guild_id=interaction.guild.id if interaction.guild else None,
+                status=new_status,
+                by=f"{interaction.user} ({interaction.user.id})",
+                guild=str(interaction.guild),
+            )
+        except Exception as e:
+            await interaction.followup.send(f"❌ Failed to refresh status: {e}", ephemeral=True)
+            await gork_log.error(
+                "Status refresh failed",
+                exc=e,
+                guild_id=interaction.guild.id if interaction.guild else None,
+                user=f"{interaction.user} ({interaction.user.id})",
+            )
 
     tree.add_command(status_group)
 

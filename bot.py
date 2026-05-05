@@ -84,8 +84,8 @@ async def generate_image_caption(ai_client: AIClient, config: dict, prompt: str)
         return f"here's your {prompt} or whatever."
 
 
-async def change_status(bot: commands.Bot, state: BotState, ai_client: AIClient, config: dict, custom_status: str | None = None) -> None:
-    """Change the bot's status and update the last change time."""
+async def change_status(bot: commands.Bot, state: BotState, ai_client: AIClient, config: dict, custom_status: str | None = None) -> str:
+    """Change the bot's status and update the last change time. Returns the new status."""
     if custom_status:
         new_status = custom_status
     else:
@@ -98,6 +98,7 @@ async def change_status(bot: commands.Bot, state: BotState, ai_client: AIClient,
     )
     state.set_last_status_change(time.time())
     log.info(f"Status changed to: {new_status}")
+    return new_status
 
 
 async def status_change_loop(bot: commands.Bot, state: BotState, ai_client: AIClient, config: dict) -> None:
