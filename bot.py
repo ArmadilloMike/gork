@@ -131,6 +131,7 @@ async def on_ready() -> None:
         state.set_last_status_change(time.time())
     await gork_log.info(
         "Gork started",
+        guild_id=None, # Global start
         user=str(bot.user),
         guilds=str(len(bot.guilds)),
     )
@@ -179,6 +180,7 @@ async def on_message(message: discord.Message) -> None:
         if is_attempt and gork_log:
             await gork_log.mod(
                 "Blocked blacklisted user",
+                guild_id=message.guild.id if message.guild else None,
                 user=f"{message.author} ({message.author.id})",
                 channel=f"#{message.channel.name} ({message.channel.id})",
                 content=message.content[:200],
@@ -215,7 +217,7 @@ async def on_message(message: discord.Message) -> None:
         trigger_type = "dm"
         log.info(f"DM from {message.author} -> '{user_text}'")
 
-    elif state.is_auto_respond_channel(message.channel.id):
+    elif state.is_auto_respond_channel(message.channel.id, message.guild.id if message.guild else None):
         user_text = message.content.strip()
         user_text = process_emojis(user_text)
         if not user_text:
@@ -254,6 +256,7 @@ async def on_message(message: discord.Message) -> None:
         log_title = "image generation requested" if is_image_request else "Message received"
         await gork_log.info(
             log_title,
+            guild_id=message.guild.id if message.guild else None,
             user=f"{message.author} ({message.author.id})",
             channel=channel_str,
             trigger=trigger_type,
@@ -272,6 +275,7 @@ async def on_message(message: discord.Message) -> None:
                 if gork_log:
                     await gork_log.success(
                         "Image generated (auto)",
+                        guild_id=message.guild.id if message.guild else None,
                         user=f"{message.author} ({message.author.id})",
                         prompt=image_prompt[:200],
                         jump_url=jump_url,
@@ -323,6 +327,7 @@ async def on_message(message: discord.Message) -> None:
                 await gork_log.error(
                     "AI generation failed",
                     exc=exc,
+                    guild_id=message.guild.id if message.guild else None,
                     user=f"{message.author} ({message.author.id})",
                     channel=channel_str,
                     input=user_text[:200],

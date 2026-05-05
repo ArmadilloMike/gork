@@ -83,6 +83,7 @@ def register_commands(
             await interaction.response.send_message(msg, ephemeral=True)
             await gork_log.blacklist(
                 "User blacklisted",
+                guild_id=interaction.guild.id if interaction.guild else None,
                 user=f"{user} ({user.id})",
                 by=f"{interaction.user} ({interaction.user.id})",
                 guild=str(interaction.guild),
@@ -109,6 +110,7 @@ def register_commands(
             await interaction.response.send_message(msg, ephemeral=True)
             await gork_log.blacklist(
                 "Channel blacklisted",
+                guild_id=interaction.guild.id if interaction.guild else None,
                 channel=f"#{channel.name} ({channel.id})",
                 by=f"{interaction.user} ({interaction.user.id})",
                 guild=str(interaction.guild),
@@ -142,6 +144,7 @@ def register_commands(
             await interaction.response.send_message(msg, ephemeral=True)
             await gork_log.blacklist(
                 "User un-blacklisted",
+                guild_id=interaction.guild.id if interaction.guild else None,
                 user=f"{user} ({user.id})",
                 by=f"{interaction.user} ({interaction.user.id})",
                 guild=str(interaction.guild),
@@ -166,6 +169,7 @@ def register_commands(
             await interaction.response.send_message(msg, ephemeral=True)
             await gork_log.blacklist(
                 "Channel un-blacklisted",
+                guild_id=interaction.guild.id if interaction.guild else None,
                 channel=f"#{channel.name} ({channel.id})",
                 by=f"{interaction.user} ({interaction.user.id})",
                 guild=str(interaction.guild),
@@ -238,6 +242,7 @@ def register_commands(
             await interaction.response.send_message(msg, ephemeral=True)
             await gork_log.whitelist(
                 "Channel whitelisted",
+                guild_id=interaction.guild.id if interaction.guild else None,
                 channel=f"#{channel.name} ({channel.id})",
                 by=f"{interaction.user} ({interaction.user.id})",
                 guild=str(interaction.guild),
@@ -264,6 +269,7 @@ def register_commands(
             await interaction.response.send_message(msg, ephemeral=True)
             await gork_log.whitelist(
                 "Channel un-whitelisted",
+                guild_id=interaction.guild.id if interaction.guild else None,
                 channel=f"#{channel.name} ({channel.id})",
                 by=f"{interaction.user} ({interaction.user.id})",
                 guild=str(interaction.guild),
@@ -315,12 +321,13 @@ def register_commands(
             await _deny(interaction, gork_log, "auto_respond add")
             return
 
-        added = state.add_auto_respond_channel(channel.id)
+        added = state.add_auto_respond_channel(interaction.guild.id, channel.id)
         if added:
             msg = f"✅ {channel.mention} is now an auto-respond channel. Gork will respond to all messages here."
             await interaction.response.send_message(msg, ephemeral=True)
             await gork_log.mod(
                 "Auto-respond enabled for channel",
+                guild_id=interaction.guild.id,
                 channel=f"#{channel.name} ({channel.id})",
                 by=f"{interaction.user} ({interaction.user.id})",
                 guild=str(interaction.guild),
@@ -339,12 +346,13 @@ def register_commands(
             await _deny(interaction, gork_log, "auto_respond remove")
             return
 
-        removed = state.remove_auto_respond_channel(channel.id)
+        removed = state.remove_auto_respond_channel(interaction.guild.id, channel.id)
         if removed:
             msg = f"✅ {channel.mention} is no longer an auto-respond channel."
             await interaction.response.send_message(msg, ephemeral=True)
             await gork_log.mod(
                 "Auto-respond disabled for channel",
+                guild_id=interaction.guild.id,
                 channel=f"#{channel.name} ({channel.id})",
                 by=f"{interaction.user} ({interaction.user.id})",
                 guild=str(interaction.guild),
@@ -360,7 +368,7 @@ def register_commands(
             await _deny(interaction, gork_log, "auto_respond list")
             return
 
-        channels = state.auto_respond_channels
+        channels = state.get_auto_respond_channels(interaction.guild.id)
 
         embed = discord.Embed(title="🤖 Gork Auto-Respond Channels", color=discord.Color.blue())
 
@@ -404,6 +412,7 @@ def register_commands(
         )
         await gork_log.memory(
             "User memory set",
+            guild_id=interaction.guild.id if interaction.guild else None,
             user=f"{user} ({user.id})",
             key=key,
             value=value[:200],
@@ -477,6 +486,7 @@ def register_commands(
             )
             await gork_log.memory(
                 "User memory deleted",
+                guild_id=interaction.guild.id if interaction.guild else None,
                 user=f"{user} ({user.id})",
                 key=key,
                 by=f"{interaction.user} ({interaction.user.id})",
@@ -512,6 +522,7 @@ def register_commands(
         await interaction.response.send_message("✅ Gork has been enabled.", ephemeral=True)
         await gork_log.mod(
             "Bot enabled",
+            guild_id=interaction.guild.id if interaction.guild else None,
             by=f"{interaction.user} ({interaction.user.id})",
             guild=str(interaction.guild),
         )
@@ -532,6 +543,7 @@ def register_commands(
         await interaction.response.send_message("⏸️ Gork has been disabled.", ephemeral=True)
         await gork_log.mod(
             "Bot disabled",
+            guild_id=interaction.guild.id if interaction.guild else None,
             by=f"{interaction.user} ({interaction.user.id})",
             guild=str(interaction.guild),
         )
@@ -633,13 +645,14 @@ def register_commands(
             await _deny(interaction, gork_log, "setlogchannel")
             return
 
-        state.set_log_channel(channel.id)
+        state.set_log_channel(interaction.guild.id, channel.id)
         await interaction.response.send_message(
             f"✅ Log channel set to {channel.mention}.", ephemeral=True
         )
         # First log goes to the new channel
         await gork_log.success(
             "Log channel configured",
+            guild_id=interaction.guild.id,
             channel=f"#{channel.name} ({channel.id})",
             by=f"{interaction.user} ({interaction.user.id})",
             guild=str(interaction.guild),
@@ -675,6 +688,7 @@ def register_commands(
         await interaction.response.send_message(f"✅ Status set to: {status}", ephemeral=True)
         await gork_log.mod(
             "Status changed",
+            guild_id=interaction.guild.id if interaction.guild else None,
             status=status,
             by=f"{interaction.user} ({interaction.user.id})",
             guild=str(interaction.guild),
@@ -696,6 +710,7 @@ async def _deny(
     )
     await gork_log.security(
         "Unauthorized command attempt",
+        guild_id=interaction.guild.id if interaction.guild else None,
         command=f"/{command}",
         user=f"{interaction.user} ({interaction.user.id})",
         guild=str(interaction.guild),
@@ -724,6 +739,7 @@ def _add_imagine_command(
 
         await gork_log.info(
             "Image generation requested",
+            guild_id=interaction.guild.id if interaction.guild else None,
             user=f"{interaction.user} ({interaction.user.id})",
             channel=f"#{interaction.channel.name}" if hasattr(interaction.channel, 'name') else "DM",
             prompt=prompt[:200],
@@ -740,6 +756,7 @@ def _add_imagine_command(
             await gork_log.error(
                 "Image generation failed",
                 exc=exc,
+                guild_id=interaction.guild.id if interaction.guild else None,
                 user=f"{interaction.user} ({interaction.user.id})",
                 prompt=prompt[:200],
                 jump_url=jump_url,
@@ -757,6 +774,7 @@ def _add_imagine_command(
         jump_url = f"https://discord.com/channels/{interaction.guild.id if interaction.guild else '@me'}/{interaction.channel.id}/{output_msg.id}"
         await gork_log.success(
             "Image generated",
+            guild_id=interaction.guild.id if interaction.guild else None,
             user=f"{interaction.user} ({interaction.user.id})",
             prompt=prompt[:200],
             jump_url=jump_url,

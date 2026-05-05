@@ -50,42 +50,42 @@ class GorkLogger:
 
     # ── Public log methods ────────────────────────────────────────────────────
 
-    async def info(self, title: str, **fields: str) -> None:
-        await self._emit(LogLevel.INFO, title, **fields)
+    async def info(self, title: str, guild_id: int | None = None, **fields: str) -> None:
+        await self._emit(LogLevel.INFO, title, guild_id=guild_id, **fields)
 
-    async def success(self, title: str, **fields: str) -> None:
-        await self._emit(LogLevel.SUCCESS, title, **fields)
+    async def success(self, title: str, guild_id: int | None = None, **fields: str) -> None:
+        await self._emit(LogLevel.SUCCESS, title, guild_id=guild_id, **fields)
 
-    async def warning(self, title: str, **fields: str) -> None:
-        await self._emit(LogLevel.WARNING, title, **fields)
+    async def warning(self, title: str, guild_id: int | None = None, **fields: str) -> None:
+        await self._emit(LogLevel.WARNING, title, guild_id=guild_id, **fields)
 
-    async def error(self, title: str, exc: Exception | None = None, **fields: str) -> None:
+    async def error(self, title: str, exc: Exception | None = None, guild_id: int | None = None, **fields: str) -> None:
         if exc is not None:
             tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
             # Truncate so it fits in an embed field (1024 char limit)
             fields["traceback"] = f"```\n{tb[-900:]}\n```"
-        await self._emit(LogLevel.ERROR, title, **fields)
+        await self._emit(LogLevel.ERROR, title, guild_id=guild_id, **fields)
 
-    async def mod(self, title: str, **fields: str) -> None:
+    async def mod(self, title: str, guild_id: int | None = None, **fields: str) -> None:
         """Moderation-related actions (blacklist changes, etc.)"""
-        await self._emit(LogLevel.MOD, title, **fields)
+        await self._emit(LogLevel.MOD, title, guild_id=guild_id, **fields)
 
-    async def blacklist(self, title: str, **fields: str) -> None:
-        await self._emit(LogLevel.BLACKLIST, title, **fields)
+    async def blacklist(self, title: str, guild_id: int | None = None, **fields: str) -> None:
+        await self._emit(LogLevel.BLACKLIST, title, guild_id=guild_id, **fields)
 
-    async def whitelist(self, title: str, **fields: str) -> None:
-        await self._emit(LogLevel.WHITELIST, title, **fields)
+    async def whitelist(self, title: str, guild_id: int | None = None, **fields: str) -> None:
+        await self._emit(LogLevel.WHITELIST, title, guild_id=guild_id, **fields)
 
-    async def memory(self, title: str, **fields: str) -> None:
-        await self._emit(LogLevel.MOD, title, **fields)
+    async def memory(self, title: str, guild_id: int | None = None, **fields: str) -> None:
+        await self._emit(LogLevel.MOD, title, guild_id=guild_id, **fields)
 
-    async def security(self, title: str, **fields: str) -> None:
+    async def security(self, title: str, guild_id: int | None = None, **fields: str) -> None:
         """Permission failures and unauthorized access attempts."""
-        await self._emit(LogLevel.SECURITY, title, **fields)
+        await self._emit(LogLevel.SECURITY, title, guild_id=guild_id, **fields)
 
     # ── Core emit ─────────────────────────────────────────────────────────────
 
-    async def _emit(self, level: LogLevel, title: str, **fields: str) -> None:
+    async def _emit(self, level: LogLevel, title: str, guild_id: int | None = None, **fields: str) -> None:
         """
         Write to Python logger and, if configured, send a Discord embed.
         Never raises — log failures must not crash the bot.
@@ -104,7 +104,7 @@ class GorkLogger:
             log.info(py_msg)
 
         # ── Discord embed ─────────────────────────────────────────────────────
-        channel_id = self._state.log_channel_id
+        channel_id = self._state.get_log_channel(guild_id)
         if channel_id is None:
             return
 

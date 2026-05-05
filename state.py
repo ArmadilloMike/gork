@@ -19,10 +19,10 @@ _DEFAULT_STATE: dict[str, Any] = {
     "blacklisted_users": [],     # list[int]  — Discord user IDs
     "blacklisted_channels": [],  # list[int]  — Discord channel IDs
     "whitelisted_channels": [],  # list[int]  — Discord channel IDs
-    "auto_respond_channels": [], # list[int]  — Discord channel IDs
+    "auto_respond_channels": {}, # dict[str, list[int]] — Guild ID -> list of channel IDs
     "user_memories": {},         # dict[int, dict[str, str]] — User memories
     "bot_enabled": True,         # bool — Whether Gork responds to messages
-    "log_channel_id": None,      # int | None — Discord channel ID
+    "log_channels": {},          # dict[str, int] — Guild ID -> log channel ID
     "last_status_change": None,  # float | None — timestamp of last status change
 }
 
@@ -34,6 +34,17 @@ def _load_raw() -> dict[str, Any]:
     try:
         with STATE_PATH.open("r", encoding="utf-8") as fh:
             data = json.load(fh)
+
+        # Migration: auto_respond_channels from list to dict
+        if isinstance(data.get("auto_respond_channels"), list):
+            data["auto_respond_channels"] = {"legacy": data["auto_respond_channels"]}
+
+        # Migration: log_channel_id (single) to log_channels (dict)
+        if "log_channel_id" in data:
+            if data["log_channel_id"] is not None and "log_channels" not in data:
+                data["log_channels"] = {"legacy": data["log_channel_id"]}
+            del data["log_channel_id"]
+
         # Backfill any keys added in later versions
         for key, default in _DEFAULT_STATE.items():
             data.setdefault(key, default)
@@ -42,6 +53,17 @@ def _load_raw() -> dict[str, Any]:
         log.warning(f"Failed to decode '{STATE_PATH}' as UTF-8. Retrying with 'latin-1'...")
         with STATE_PATH.open("r", encoding="latin-1") as fh:
             data = json.load(fh)
+
+        # Migration: auto_respond_channels from list to dict
+        if isinstance(data.get("auto_respond_channels"), list):
+            data["auto_respond_channels"] = {"legacy": data["auto_respond_channels"]}
+
+        # Migration: log_channel_id (single) to log_channels (dict)
+        if "log_channel_id" in data:
+            if data["log_channel_id"] is not None and "log_channels" not in data:
+                data["log_channels"] = {"legacy": data["log_channel_id"]}
+            del data["log_channel_id"]
+
         # Backfill any keys added in later versions
         for key, default in _DEFAULT_STATE.items():
             data.setdefault(key, default)
@@ -169,39 +191,78 @@ class BotState:
 
     # ── Auto-respond: channels ────────────────────────────────────────────────
 
-    def add_auto_respond_channel(self, channel_id: int) -> bool:
-        """Add channel_id to auto-respond list. Returns True if added, False if already present."""
-        if channel_id in self._data["auto_respond_channels"]:
+    def add_auto_respond_channel(self, guild_id: int, channel_id: int) -> bool:
+        """Add channel_id to auto-respond list for a guild. Returns True if added."""
+        gid = str(guild_id)
+        if gid not in self._data["auto_respond_channels"]:
+            self._data["auto_respond_channels"][gid] = []
+
+        if channel_id in self._data["auto_respond_channels"][gid]:
             return False
-        self._data["auto_respond_channels"].append(channel_id)
+
+        self._data["auto_respond_channels"][gid].append(channel_id)
         self._save()
         return True
 
-    def remove_auto_respond_channel(self, channel_id: int) -> bool:
-        """Remove channel_id from auto-respond list. Returns True if removed, False if not found."""
+    def remove_auto_respond_channel(self, guild_id: int, channel_id: int) -> bool:
+        """Remove channel_id from auto-respond list for a guild."""
+        gid = str(guild_id)
+        if gid not in self._data["auto_respond_channels"]:
+            return False
         try:
-            self._data["auto_respond_channels"].remove(channel_id)
+            self._data["auto_respond_channels"][gid].remove(channel_id)
+            if not self._data["auto_respond_channels"][gid]:
+                del self._data["auto_respond_channels"][gid]
         except ValueError:
             return False
         self._save()
         return True
 
-    def is_auto_respond_channel(self, channel_id: int) -> bool:
-        return channel_id in self._data["auto_respond_channels"]
+    def is_auto_respond_channel(self, channel_id: int, guild_id: int | None = None) -> bool:
+        """Check if a channel is in auto-respond mode."""
+        # Check specific guild
+        if guild_id:
+            gid = str(guild_id)
+            if channel_id in self._data["auto_respond_channels"].get(gid, []):
+                return True
 
-    @property
-    def auto_respond_channels(self) -> list[int]:
-        return list(self._data["auto_respond_channels"])
+        # Check legacy
+        if channel_id in self._data["auto_respond_channels"].get("legacy", []):
+            return True
+
+        # Fallback: check all guilds if guild_id not provided
+        if guild_id is None:
+            for channels in self._data["auto_respond_channels"].values():
+                if channel_id in channels:
+                    return True
+        return False
+
+    def get_auto_respond_channels(self, guild_id: int | None = None) -> list[int]:
+        """Get all auto-respond channels for a guild (or all if None)."""
+        if guild_id:
+            return list(self._data["auto_respond_channels"].get(str(guild_id), []))
+
+        # Return flattened list of all channels
+        all_channels = []
+        for channels in self._data["auto_respond_channels"].values():
+            all_channels.extend(channels)
+        return list(set(all_channels))
 
     # ── Log channel ───────────────────────────────────────────────────────────
 
-    def set_log_channel(self, channel_id: int) -> None:
-        self._data["log_channel_id"] = channel_id
+    def set_log_channel(self, guild_id: int, channel_id: int) -> None:
+        """Set the log channel for a specific guild."""
+        self._data["log_channels"][str(guild_id)] = channel_id
         self._save()
 
-    @property
-    def log_channel_id(self) -> int | None:
-        return self._data.get("log_channel_id")
+    def get_log_channel(self, guild_id: int | None) -> int | None:
+        """Get the log channel for a guild, falling back to legacy if necessary."""
+        if guild_id:
+            cid = self._data["log_channels"].get(str(guild_id))
+            if cid:
+                return cid
+
+        return self._data["log_channels"].get("legacy")
 
     # ── User memories ────────────────────────────────────────────────────────────
 
