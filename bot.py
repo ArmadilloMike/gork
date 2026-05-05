@@ -65,6 +65,25 @@ async def generate_status(ai_client: AIClient, config: dict) -> str:
         return "being lazy"
 
 
+async def generate_image_caption(ai_client: AIClient, config: dict, prompt: str) -> str:
+    """Generate a short sentence about the generated image."""
+    bot_name = config.get("personality", {}).get("name", "Gork")
+    system_prompt = (
+        f"You are {bot_name}, a lazy, sarcastic, and super funny bot. "
+        "The user just asked you to generate an image, and you did. "
+        "Write a VERY short (one short sentence), sarcastic, or funny comment about the image you just 'made' for them. "
+        "Keep it in character. No emojis. Lowercase is fine."
+    )
+    user_prompt = f"The image prompt was: \"{prompt}\". Say something about it."
+    
+    try:
+        response = await ai_client.chat(user_prompt, system=system_prompt)
+        return response.strip()
+    except Exception as e:
+        log.error(f"Failed to generate image caption: {e}")
+        return f"here's your {prompt} or whatever."
+
+
 async def change_status(bot: commands.Bot, state: BotState, ai_client: AIClient, config: dict, custom_status: str | None = None) -> None:
     """Change the bot's status and update the last change time."""
     if custom_status:
@@ -103,7 +122,7 @@ async def on_ready() -> None:
 
     # on_ready can fire multiple times on reconnect — only register once
     if not _commands_registered:
-        register_commands(bot, state, gork_log, config, image_client)
+        register_commands(bot, state, gork_log, config, ai_client, image_client)
         _commands_registered = True
 
     # Sync slash commands.
@@ -274,7 +293,10 @@ async def on_message(message: discord.Message) -> None:
             try:
                 image_bytes = await image_client.generate(image_prompt)
                 file = discord.File(fp=io.BytesIO(image_bytes), filename="gork_image.png")
-                await message.reply(content=f'🎨 **"{image_prompt}"**', file=file)
+                
+                # Generate a short sentence about the image
+                caption = await generate_image_caption(ai_client, config, image_prompt)
+                await message.reply(content=caption, file=file)
 
                 if gork_log:
                     await gork_log.success(

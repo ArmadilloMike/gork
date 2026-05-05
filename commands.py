@@ -45,6 +45,7 @@ def register_commands(
     state: "BotState",
     gork_log: "GorkLogger",
     config: dict,
+    ai_client: "AIClient",
     image_client: "ImageGenClient | None" = None,
 ) -> None:
     """
@@ -661,7 +662,7 @@ def register_commands(
 
     # ══ /imagine ══════════════════════════════════════════════════════════════
     if image_client is not None:
-        _add_imagine_command(tree, image_client, gork_log)
+        _add_imagine_command(tree, image_client, gork_log, ai_client, config)
 
     # ══ /status ══════════════════════════════════════════════════════════════════
 
@@ -725,8 +726,15 @@ def _add_imagine_command(
     tree: app_commands.CommandTree,
     image_client: "ImageGenClient",
     gork_log: "GorkLogger",
+    ai_client: "AIClient",
+    config: dict,
 ) -> None:
     """Register /imagine onto the command tree."""
+    
+    # We need to import the caption generator from bot.py, 
+    # but that might cause circular imports.
+    # Let's just define a similar helper or import it locally.
+    from bot import generate_image_caption
 
     @tree.command(
         name="imagine",
@@ -767,8 +775,10 @@ def _add_imagine_command(
             fp=io.BytesIO(image_bytes),
             filename="gork_image.png",
         )
+        # Generate a short sentence about the image
+        caption = await generate_image_caption(ai_client, config, prompt)
         output_msg = await interaction.followup.send(
-            content=f'🎨 **"{prompt}"**',
+            content=caption,
             file=file,
         )
         jump_url = f"https://discord.com/channels/{interaction.guild.id if interaction.guild else '@me'}/{interaction.channel.id}/{output_msg.id}"
