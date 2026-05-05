@@ -6,6 +6,7 @@ Isolated from Discord logic; receives plain strings, returns plain strings.
 
 import asyncio
 import logging
+import json
 from typing import Any
 
 import aiohttp
@@ -147,6 +148,72 @@ class AIClient:
             log.warning(f"Failed to detect image intent: {e}")
             
         return None
+
+    # ── Memory Extraction ─────────────────────────────────────────────────────
+
+    async def extract_memories(self, user_message: str, author_name: str, context: list[str] | None = None, existing_memories: dict[str, str] | None = None) -> dict[str, str]:
+        """
+        Analyze the interaction to extract facts or preferences about the user.
+        Returns a dictionary of {key: value} pairs to be stored in memory.
+        """
+        system_prompt = (
+            "You are a memory extraction system for a Discord bot named Gork. "
+            "Your job is to identify recurring preferences, explicit facts, or notable traits about a user. "
+            "Focus on stable information: likes, dislikes, habits, occupation, location, or personality traits. "
+            "Ignore transient info: current mood, temporary actions, or 'meta' talk about the bot unless it's a preference. "
+            "Compare the conversation with 'Current Known Memories'. "
+            "If you find NEW information or if a preference is REINFORCED/CHANGED, output a JSON object. "
+            "Keys should be concise (e.g., 'favorite_food'). Values should be the summary of the fact. "
+            "If no updates are needed, output ONLY '{}'. "
+            "Do NOT output any conversational text, only the JSON object."
+        )
+
+        try:
+            # Prepare context for the extraction
+            context_text = ""
+            if context:
+                context_text = "## Recent Context\n" + "\n".join(context) + "\n\n"
+            
+            memories_text = ""
+            if existing_memories:
+                mem_lines = [f"- {k}: {v}" for k, v in existing_memories.items()]
+                memories_text = "## Current Known Memories\n" + "\n".join(mem_lines) + "\n\n"
+            
+            user_input = f"{context_text}{memories_text}User ({author_name}): {user_message}"
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_input}
+            ]
+            
+            payload = {
+                "model": self._model,
+                "messages": messages,
+                "max_tokens": 200,
+                "temperature": 0.0,
+            }
+            
+            session = await self._get_session()
+            async with session.post(self._api_url, json=payload) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    content = self._parse_response(data)
+                    # Try to parse the JSON content
+                    try:
+                        # Find the JSON part in case the model added some fluff
+                        start = content.find('{')
+                        end = content.rfind('}') + 1
+                        if start != -1 and end != 0:
+                            json_str = content[start:end]
+                            extracted = json.loads(json_str)
+                            if isinstance(extracted, dict):
+                                return extracted
+                    except json.JSONDecodeError:
+                        log.warning(f"Failed to parse memory JSON: {content}")
+        except Exception as e:
+            log.warning(f"Memory extraction failed: {e}")
+            
+        return {}
 
     # ── Prompt construction ───────────────────────────────────────────────────
 

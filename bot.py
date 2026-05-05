@@ -337,14 +337,22 @@ async def on_message(message: discord.Message) -> None:
     state.set_user_memory(user_id, "interaction_count", str(count + 1))
     # Set last interaction
     state.set_user_memory(user_id, "last_interaction", datetime.datetime.now().isoformat())
-    # Basic sentiment analysis
-    lower_text = user_text.lower()
-    if any(word in lower_text for word in ["thank", "thanks", "appreciate", "good job", "well done"]):
-        state.set_user_memory(user_id, "attitude", "grateful")
-    elif any(word in lower_text for word in ["stupid", "dumb", "idiot", "bad", "hate"]):
-        state.set_user_memory(user_id, "attitude", "critical")
-    elif any(word in lower_text for word in ["love", "awesome", "great", "amazing"]):
-        state.set_user_memory(user_id, "attitude", "positive")
+
+    # ── Background Memory Extraction ──────────────────────────────────────────
+    try:
+        new_memories = await ai_client.extract_memories(
+            user_message=user_text,
+            author_name=str(message.author.display_name),
+            context=context,
+            existing_memories=memories
+        )
+        for key, value in new_memories.items():
+            # Clean up key to be a valid identifier
+            clean_key = key.strip().lower().replace(" ", "_")
+            state.set_user_memory(user_id, clean_key, str(value).strip())
+            log.info(f"Auto-saved memory for {message.author}: {clean_key} -> {value}")
+    except Exception as e:
+        log.warning(f"Background memory extraction failed: {e}")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
