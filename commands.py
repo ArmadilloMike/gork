@@ -299,6 +299,85 @@ def register_commands(
 
     tree.add_command(whitelist_group)
 
+    # ══ /auto_respond ════════════════════════════════════════════════════════════
+
+    auto_respond_group = app_commands.Group(
+        name="auto_respond",
+        description="Manage channels where Gork always responds (requires gork-manager role).",
+    )
+
+    @auto_respond_group.command(name="add", description="Set a channel where Gork will always respond to messages.")
+    @app_commands.describe(channel="The channel to enable auto-respond in.")
+    async def auto_respond_add(
+        interaction: discord.Interaction, channel: discord.TextChannel
+    ) -> None:
+        if not has_manager_role(interaction, role_name):
+            await _deny(interaction, gork_log, "auto_respond add")
+            return
+
+        added = state.add_auto_respond_channel(channel.id)
+        if added:
+            msg = f"✅ {channel.mention} is now an auto-respond channel. Gork will respond to all messages here."
+            await interaction.response.send_message(msg, ephemeral=True)
+            await gork_log.mod(
+                "Auto-respond enabled for channel",
+                channel=f"#{channel.name} ({channel.id})",
+                by=f"{interaction.user} ({interaction.user.id})",
+                guild=str(interaction.guild),
+            )
+        else:
+            await interaction.response.send_message(
+                f"⚠️ {channel.mention} is already an auto-respond channel.", ephemeral=True
+            )
+
+    @auto_respond_group.command(name="remove", description="Remove a channel from auto-respond mode.")
+    @app_commands.describe(channel="The channel to disable auto-respond in.")
+    async def auto_respond_remove(
+        interaction: discord.Interaction, channel: discord.TextChannel
+    ) -> None:
+        if not has_manager_role(interaction, role_name):
+            await _deny(interaction, gork_log, "auto_respond remove")
+            return
+
+        removed = state.remove_auto_respond_channel(channel.id)
+        if removed:
+            msg = f"✅ {channel.mention} is no longer an auto-respond channel."
+            await interaction.response.send_message(msg, ephemeral=True)
+            await gork_log.mod(
+                "Auto-respond disabled for channel",
+                channel=f"#{channel.name} ({channel.id})",
+                by=f"{interaction.user} ({interaction.user.id})",
+                guild=str(interaction.guild),
+            )
+        else:
+            await interaction.response.send_message(
+                f"⚠️ {channel.mention} is not an auto-respond channel.", ephemeral=True
+            )
+
+    @auto_respond_group.command(name="list", description="Show all auto-respond channels.")
+    async def auto_respond_list(interaction: discord.Interaction) -> None:
+        if not has_manager_role(interaction, role_name):
+            await _deny(interaction, gork_log, "auto_respond list")
+            return
+
+        channels = state.auto_respond_channels
+
+        embed = discord.Embed(title="🤖 Gork Auto-Respond Channels", color=discord.Color.blue())
+
+        if channels:
+            chan_lines = [f"<#{cid}>" for cid in channels]
+            embed.add_field(
+                name=f"Channels ({len(channels)})",
+                value="\n".join(chan_lines)[:1024],
+                inline=False,
+            )
+        else:
+            embed.add_field(name="Channels", value="*None*", inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    tree.add_command(auto_respond_group)
+
     # ══ /memory ════════════════════════════════════════════════════════════════
 
     memory_group = app_commands.Group(

@@ -139,6 +139,8 @@ gork/
 | `/blacklist remove <user/channel>` | Unblock interaction | Manager |
 | `/blacklist list` | Show all blocks | Manager |
 | `/whitelist on/off <channel>` | Toggle whitelist mode | Manager |
+| `/auto_respond add/remove <channel>` | Toggle always-respond mode | Manager |
+| `/auto_respond list` | Show always-respond channels | Manager |
 | `/memory remember <user> <key> <val>` | Save user fact | Manager |
 | `/memory recall <user> <key>` | Get user fact | Manager |
 | `/set_log_channel <channel>` | Set Discord log output | Manager |
@@ -175,7 +177,7 @@ Personality is 100% decoupled from code. Edit `config/config.json` to change Gor
 
 ## 📄 License
 
-- [ ] TODO: Add a LICENSE file (e.g., MIT).
+MIT License
 
 ---
 

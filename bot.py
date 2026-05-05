@@ -215,6 +215,14 @@ async def on_message(message: discord.Message) -> None:
         trigger_type = "dm"
         log.info(f"DM from {message.author} -> '{user_text}'")
 
+    elif state.is_auto_respond_channel(message.channel.id):
+        user_text = message.content.strip()
+        user_text = process_emojis(user_text)
+        if not user_text:
+            user_text = "hey"
+        trigger_type = "auto_respond"
+        log.info(f"Auto-respond in {message.channel} from {message.author} -> '{user_text}'")
+
     # ── Image Intent Detection (Implicit/Explicit) ────────────────────────────
     is_image_request = False
     image_prompt = None

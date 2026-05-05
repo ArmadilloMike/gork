@@ -19,6 +19,7 @@ _DEFAULT_STATE: dict[str, Any] = {
     "blacklisted_users": [],     # list[int]  — Discord user IDs
     "blacklisted_channels": [],  # list[int]  — Discord channel IDs
     "whitelisted_channels": [],  # list[int]  — Discord channel IDs
+    "auto_respond_channels": [], # list[int]  — Discord channel IDs
     "user_memories": {},         # dict[int, dict[str, str]] — User memories
     "bot_enabled": True,         # bool — Whether Gork responds to messages
     "log_channel_id": None,      # int | None — Discord channel ID
@@ -165,6 +166,32 @@ class BotState:
     @property
     def whitelisted_channels(self) -> list[int]:
         return list(self._data["whitelisted_channels"])
+
+    # ── Auto-respond: channels ────────────────────────────────────────────────
+
+    def add_auto_respond_channel(self, channel_id: int) -> bool:
+        """Add channel_id to auto-respond list. Returns True if added, False if already present."""
+        if channel_id in self._data["auto_respond_channels"]:
+            return False
+        self._data["auto_respond_channels"].append(channel_id)
+        self._save()
+        return True
+
+    def remove_auto_respond_channel(self, channel_id: int) -> bool:
+        """Remove channel_id from auto-respond list. Returns True if removed, False if not found."""
+        try:
+            self._data["auto_respond_channels"].remove(channel_id)
+        except ValueError:
+            return False
+        self._save()
+        return True
+
+    def is_auto_respond_channel(self, channel_id: int) -> bool:
+        return channel_id in self._data["auto_respond_channels"]
+
+    @property
+    def auto_respond_channels(self) -> list[int]:
+        return list(self._data["auto_respond_channels"])
 
     # ── Log channel ───────────────────────────────────────────────────────────
 
