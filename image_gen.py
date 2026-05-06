@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import concurrent.futures
 from typing import Any
 
 import aiohttp
@@ -114,10 +115,10 @@ class ImageGenClient:
         # Log the raw response keys to help debug if parsing fails
         log.debug(f"Image API response keys: {list(data.get('choices', [{}])[0].get('message', {}).keys())}")
 
-        return self._extract_image_bytes(data)
+        return await self._extract_image_bytes(data)
 
     @staticmethod
-    def _extract_image_bytes(data: dict[str, Any]) -> bytes:
+    async def _extract_image_bytes(data: dict[str, Any]) -> bytes:
         """
         Extract image bytes from the API response.
 
@@ -131,6 +132,18 @@ class ImageGenClient:
 
         Shape C — content array with inline_data blocks (Gemini native format):
           message.content = [{"type": "image", "inline_data": {"data": "<base64>", "mime_type": "image/png"}}]
+        """
+        loop = asyncio.get_running_loop()
+        try:
+            return await loop.run_in_executor(None, _extract_image_bytes_sync, data)
+        except (KeyError, IndexError, TypeError) as exc:
+            log.error(f"Unexpected image response shape: {data}")
+            raise RuntimeError(f"Could not parse image response: {exc}") from exc
+
+    @staticmethod
+    def _extract_image_bytes_sync(data: dict[str, Any]) -> bytes:
+        """
+        Synchronous helper for _extract_image_bytes.
         """
         try:
             message = data["choices"][0]["message"]

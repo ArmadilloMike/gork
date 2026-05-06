@@ -8,6 +8,8 @@ import logging
 import emoji
 import base64
 import aiohttp
+import asyncio
+import concurrent.futures
 from io import BytesIO
 from PIL import Image
 
@@ -52,7 +54,7 @@ async def download_image(url: str) -> bytes | None:
         return None
 
 
-def image_to_base64(image_bytes: bytes) -> str | None:
+async def image_to_base64(image_bytes: bytes) -> str | None:
     """
     Convert image bytes to base64-encoded string.
     Also validates that it's a valid image.
@@ -63,14 +65,24 @@ def image_to_base64(image_bytes: bytes) -> str | None:
     Returns:
         Base64-encoded string, or None if invalid image.
     """
+    loop = asyncio.get_running_loop()
     try:
-        # Validate it's actually an image
-        Image.open(BytesIO(image_bytes))
-        # Encode to base64
-        return base64.b64encode(image_bytes).decode("utf-8")
+        # Validate it's actually an image and encode to base64 in a thread
+        result = await loop.run_in_executor(None, _image_to_base64_sync, image_bytes)
+        return result
     except Exception as e:
         log.warning(f"Error processing image: {e}")
         return None
+
+
+def _image_to_base64_sync(image_bytes: bytes) -> str | None:
+    """
+    Synchronous helper for image_to_base64.
+    """
+    # Validate it's actually an image
+    Image.open(BytesIO(image_bytes))
+    # Encode to base64
+    return base64.b64encode(image_bytes).decode("utf-8")
 
 
 async def extract_images_from_message(message) -> list[dict]:
@@ -93,7 +105,7 @@ async def extract_images_from_message(message) -> list[dict]:
             if attachment.content_type and attachment.content_type.startswith("image/"):
                 image_bytes = await download_image(attachment.url)
                 if image_bytes:
-                    base64_str = image_to_base64(image_bytes)
+                    base64_str = await image_to_base64(image_bytes)
                     if base64_str:
                         images.append({
                             "base64": base64_str,
@@ -106,7 +118,7 @@ async def extract_images_from_message(message) -> list[dict]:
             if embed.image:
                 image_bytes = await download_image(embed.image.url)
                 if image_bytes:
-                    base64_str = image_to_base64(image_bytes)
+                    base64_str = await image_to_base64(image_bytes)
                     if base64_str:
                         images.append({
                             "base64": base64_str,
