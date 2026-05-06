@@ -364,6 +364,19 @@ async def on_message(message: discord.Message) -> None:
         if not memories:
             memories = None
 
+        # Fetch guild parents
+        guild_parents = {}
+        if message.guild:
+            parent_ids = state.get_guild_parents(message.guild.id)
+            if "mother" in parent_ids:
+                mother = message.guild.get_member(parent_ids["mother"])
+                if mother:
+                    guild_parents["mother"] = mother.display_name
+            if "father" in parent_ids:
+                father = message.guild.get_member(parent_ids["father"])
+                if father:
+                    guild_parents["father"] = father.display_name
+
         try:
             response = await ai_client.generate_response(
                 user_message=user_text,
@@ -371,6 +384,7 @@ async def on_message(message: discord.Message) -> None:
                 context=context,
                 memories=memories,
                 images=images if images else None,
+                guild_parents=guild_parents if guild_parents else None,
             )
         except Exception as exc:
             log.exception("AI generation failed")

@@ -145,6 +145,10 @@ gork/
 | `/auto_respond list` | Show always-respond channels | Manager |
 | `/memory remember <user> <key> <val>` | Save user fact | Manager |
 | `/memory recall <user> <key>` | Get user fact | Manager |
+| `/setmother <user>` | Set guild's mother | Manager |
+| `/setfather <user>` | Set guild's father | Manager |
+| `/clearmother` | Remove guild's mother | Manager |
+| `/clearfather` | Remove guild's father | Manager |
 | `/set_log_channel <channel>` | Set Discord log output | Manager |
 | `/gork enable/disable` | Global bot toggle | Manager |
 

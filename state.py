@@ -24,6 +24,7 @@ _DEFAULT_STATE: dict[str, Any] = {
     "bot_enabled": True,         # bool — Whether Gork responds to messages
     "log_channels": {},          # dict[str, int] — Guild ID -> log channel ID
     "last_status_change": None,  # float | None — timestamp of last status change
+    "guild_parents": {},         # dict[str, dict[str, int]] — Guild ID -> {"mother": id, "father": id}
 }
 
 
@@ -314,3 +315,43 @@ class BotState:
     @property
     def last_status_change(self) -> float | None:
         return self._data.get("last_status_change")
+
+    # ── Guild Parents ────────────────────────────────────────────────────────────
+
+    def set_guild_mother(self, guild_id: int, user_id: int | None) -> None:
+        """Set or clear the mother for a specific guild."""
+        gid = str(guild_id)
+        if gid not in self._data["guild_parents"]:
+            self._data["guild_parents"][gid] = {}
+        if user_id is None:
+            if "mother" in self._data["guild_parents"][gid]:
+                del self._data["guild_parents"][gid]["mother"]
+        else:
+            self._data["guild_parents"][gid]["mother"] = user_id
+        
+        # Clean up empty guild entry
+        if not self._data["guild_parents"][gid]:
+            del self._data["guild_parents"][gid]
+            
+        self._save()
+
+    def set_guild_father(self, guild_id: int, user_id: int | None) -> None:
+        """Set or clear the father for a specific guild."""
+        gid = str(guild_id)
+        if gid not in self._data["guild_parents"]:
+            self._data["guild_parents"][gid] = {}
+        if user_id is None:
+            if "father" in self._data["guild_parents"][gid]:
+                del self._data["guild_parents"][gid]["father"]
+        else:
+            self._data["guild_parents"][gid]["father"] = user_id
+
+        # Clean up empty guild entry
+        if not self._data["guild_parents"][gid]:
+            del self._data["guild_parents"][gid]
+
+        self._save()
+
+    def get_guild_parents(self, guild_id: int) -> dict[str, int]:
+        """Get the mother and father IDs for a guild."""
+        return dict(self._data["guild_parents"].get(str(guild_id), {}))

@@ -725,6 +725,84 @@ def register_commands(
 
     tree.add_command(status_group)
 
+    # ── Parent management commands ───────────────────────────────────────────
+
+    @tree.command(name="setmother", description="Set the guild's mother.")
+    @app_commands.describe(user="The user who will be the guild's mother.")
+    async def set_mother(interaction: discord.Interaction, user: discord.Member) -> None:
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+        if not has_manager_role(interaction, role_name):
+            await _deny(interaction, gork_log, "setmother")
+            return
+
+        state.set_guild_mother(interaction.guild.id, user.id)
+        await interaction.response.send_message(f"✅ {user.display_name} is now the guild's mother.", ephemeral=True)
+        await gork_log.mod(
+            "Mother set",
+            guild_id=interaction.guild.id,
+            user=f"{user} ({user.id})",
+            by=f"{interaction.user} ({interaction.user.id})",
+            guild=str(interaction.guild),
+        )
+
+    @tree.command(name="setfather", description="Set the guild's father.")
+    @app_commands.describe(user="The user who will be the guild's father.")
+    async def set_father(interaction: discord.Interaction, user: discord.Member) -> None:
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+        if not has_manager_role(interaction, role_name):
+            await _deny(interaction, gork_log, "setfather")
+            return
+
+        state.set_guild_father(interaction.guild.id, user.id)
+        await interaction.response.send_message(f"✅ {user.display_name} is now the guild's father.", ephemeral=True)
+        await gork_log.mod(
+            "Father set",
+            guild_id=interaction.guild.id,
+            user=f"{user} ({user.id})",
+            by=f"{interaction.user} ({interaction.user.id})",
+            guild=str(interaction.guild),
+        )
+
+    @tree.command(name="clearmother", description="Clear the guild's mother.")
+    async def clear_mother(interaction: discord.Interaction) -> None:
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+        if not has_manager_role(interaction, role_name):
+            await _deny(interaction, gork_log, "clearmother")
+            return
+
+        state.set_guild_mother(interaction.guild.id, None)
+        await interaction.response.send_message("✅ Guild's mother cleared.", ephemeral=True)
+        await gork_log.mod(
+            "Mother cleared",
+            guild_id=interaction.guild.id,
+            by=f"{interaction.user} ({interaction.user.id})",
+            guild=str(interaction.guild),
+        )
+
+    @tree.command(name="clearfather", description="Clear the guild's father.")
+    async def clear_father(interaction: discord.Interaction) -> None:
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+        if not has_manager_role(interaction, role_name):
+            await _deny(interaction, gork_log, "clearfather")
+            return
+
+        state.set_guild_father(interaction.guild.id, None)
+        await interaction.response.send_message("✅ Guild's father cleared.", ephemeral=True)
+        await gork_log.mod(
+            "Father cleared",
+            guild_id=interaction.guild.id,
+            by=f"{interaction.user} ({interaction.user.id})",
+            guild=str(interaction.guild),
+        )
+
 # ── Shared denial helper ──────────────────────────────────────────────────────
 
 async def _deny(

@@ -259,7 +259,7 @@ class AIClient:
         return "\n".join(lines)
 
     def _build_messages(
-        self, user_message: str, author_name: str, context: list[Any] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None
+        self, user_message: str, author_name: str, context: list[Any] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None, guild_parents: dict[str, str] | None = None
     ) -> list[dict]:
         """Return the full messages list for the API call.
         
@@ -269,12 +269,33 @@ class AIClient:
             context: List of recent messages (strings or dicts with 'author', 'content', 'images').
             memories: User memory dictionary.
             images: List of dicts with 'base64' and 'mime_type' keys for vision API.
+            guild_parents: Dict of guild parent names.
         
         Returns:
             List of message dicts compatible with OpenAI vision API.
         """
         system_prompt = self._build_system_prompt()
         messages = [{"role": "system", "content": system_prompt}]
+
+        if guild_parents:
+            parent_info = []
+            if "mother" in guild_parents:
+                parent_info.append(f"Mother: {guild_parents['mother']}")
+            if "father" in guild_parents:
+                parent_info.append(f"Father: {guild_parents['father']}")
+            
+            if parent_info:
+                parent_prompt = (
+                    "## Guild Parent Information\n"
+                    "You have a per-guild assigned 'mother' and 'father'. Here they are for this guild:\n"
+                    + "\n".join(parent_info) + "\n\n"
+                    "RULES FOR PARENTS:\n"
+                    "1. If the user asks 'Who is your mother?' or 'Who is your father?', reply with a shortened nickname version of the stored name. "
+                    "Choose the nickname style yourself (e.g., truncation, playful shortening, stylized version). Stay in character.\n"
+                    "2. If the user message author is your mother or father, you may optionally include 'mom' or 'dad' in your reply. "
+                    "This is stylistic—do it only when it fits the vibe of your personality.\n"
+                )
+                messages.append({"role": "system", "content": parent_prompt})
 
         if memories:
             mem_lines = [f"- {k}: {v}" for k, v in memories.items()]
@@ -327,7 +348,7 @@ class AIClient:
     # ── API call ──────────────────────────────────────────────────────────────
 
     async def generate_response(
-        self, user_message: str, author_name: str = "User", context: list[Any] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None
+        self, user_message: str, author_name: str = "User", context: list[Any] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None, guild_parents: dict[str, str] | None = None
     ) -> str:
         """
         Send a prompt to the Hack Club AI proxy and return the text reply.
@@ -338,6 +359,7 @@ class AIClient:
             context: List of recent messages (strings or dicts).
             memories: Dict of user memories as key-value pairs.
             images: List of dicts with 'base64' and 'mime_type' for vision API.
+            guild_parents: Dict of guild parent names (mother/father).
 
         Returns:
             The AI-generated response as a plain string.
@@ -345,7 +367,7 @@ class AIClient:
         Raises:
             RuntimeError: On non-200 HTTP status or malformed response.
         """
-        messages = self._build_messages(user_message, author_name, context, memories, images)
+        messages = self._build_messages(user_message, author_name, context, memories, images, guild_parents)
         payload: dict[str, Any] = {
             "model": self._model,
             "messages": messages,

@@ -64,3 +64,32 @@ def test_bot_enabled_toggle(mock_state_path):
     assert state.bot_enabled is True
     state.set_bot_enabled(False)
     assert state.bot_enabled is False
+
+def test_guild_parents(mock_state_path):
+    state = BotState()
+    guild_id = 777
+    mother_id = 111
+    father_id = 222
+    
+    state.set_guild_mother(guild_id, mother_id)
+    state.set_guild_father(guild_id, father_id)
+    
+    parents = state.get_guild_parents(guild_id)
+    assert parents["mother"] == mother_id
+    assert parents["father"] == father_id
+    
+    # Test persistence
+    new_state = BotState()
+    parents = new_state.get_guild_parents(guild_id)
+    assert parents["mother"] == mother_id
+    assert parents["father"] == father_id
+    
+    # Test clearing
+    state.set_guild_mother(guild_id, None)
+    parents = state.get_guild_parents(guild_id)
+    assert "mother" not in parents
+    assert parents["father"] == father_id
+    
+    state.set_guild_father(guild_id, None)
+    parents = state.get_guild_parents(guild_id)
+    assert parents == {}

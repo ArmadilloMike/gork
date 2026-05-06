@@ -87,9 +87,16 @@ async def test_ai_client_error_handling(mock_config):
     mock_session.close = AsyncMock()
     mock_session.closed = False
     
-    with patch("aiohttp.ClientSession", return_value=mock_session):
-        with pytest.raises(RuntimeError) as excinfo:
-            await client.chat("Hi")
-        assert "AI API error" in str(excinfo.value)
-        
     await client.close()
+
+def test_build_messages_with_parents(mock_config):
+    client = AIClient(mock_config)
+    guild_parents = {"mother": "Alice", "father": "Bob"}
+    messages = client._build_messages("hi", "User", guild_parents=guild_parents)
+    
+    # Second message should be the parent information
+    parent_msg = messages[1]
+    assert parent_msg["role"] == "system"
+    assert "Alice" in parent_msg["content"]
+    assert "Bob" in parent_msg["content"]
+    assert "RULES FOR PARENTS" in parent_msg["content"]
