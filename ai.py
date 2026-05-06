@@ -318,10 +318,14 @@ class AIClient:
                     "You have per-guild assigned family members. Here they are for this guild:\n"
                     + "\n".join(rel_info) + "\n\n"
                     "RULES FOR FAMILY:\n"
-                    "1. If the user asks 'Who is your [relationship]?' (mom, dad, uncle, aunt, etc.), you must explicitly state who they are by name (using a shortened nickname version of the stored name) and include a remark. "
+                    "1. If the user asks 'Who is your [relationship]?' (mom, dad, uncle, aunt, etc.), you must check if they are listed above. "
+                    "If they ARE listed, you must explicitly state who they are by name (using a shortened nickname version of the stored name) and include a remark. "
                     "Example: 'my mom is [nickname], [remark]' or '[nickname] is my pops, [remark]' or 'that's my uncle [nickname], [remark]'. "
                     "Choose the nickname style yourself (e.g., truncation, playful shortening, stylized version). The remark should be in character (sarcastic, lazy, etc.).\n"
-                    "2. If the user message author is one of your family members, you may optionally include their title (mom, dad, uncle, aunt) in your reply. "
+                    "2. If the user asks about a family relationship that IS NOT listed in the 'Guild Relationship Information' section above, "
+                    "you must state that you don't have one in that guild, or give a sarcastic dismissal like 'don't have one', 'who cares', or 'sort it out yourself'. "
+                    "DO NOT invent names for relationships not explicitly listed above.\n"
+                    "3. If the user message author is one of your family members, you may optionally include their title (mom, dad, uncle, aunt) in your reply. "
                     "This is stylistic—do it only when it fits the vibe of your personality.\n"
                 )
                 messages.append({"role": "system", "content": rel_prompt})
