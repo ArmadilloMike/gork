@@ -304,13 +304,13 @@ class AIClient:
         if guild_relationships:
             rel_info = []
             if "mother" in guild_relationships:
-                rel_info.append(f"Mother: {guild_relationships['mother']}")
+                rel_info.append(f"mother: {guild_relationships['mother']}")
             if "father" in guild_relationships:
-                rel_info.append(f"Father: {guild_relationships['father']}")
+                rel_info.append(f"father: {guild_relationships['father']}")
             if "uncles" in guild_relationships:
-                rel_info.append(f"Uncles: {', '.join(guild_relationships['uncles'])}")
+                rel_info.append(f"uncles: {', '.join(guild_relationships['uncles'])}")
             if "aunts" in guild_relationships:
-                rel_info.append(f"Aunts: {', '.join(guild_relationships['aunts'])}")
+                rel_info.append(f"aunts: {', '.join(guild_relationships['aunts'])}")
             
             if rel_info:
                 rel_prompt = (
@@ -318,12 +318,12 @@ class AIClient:
                     "You have per-guild assigned family members. Here they are for this guild:\n"
                     + "\n".join(rel_info) + "\n\n"
                     "RULES FOR FAMILY:\n"
-                    "1. If the user asks 'Who is your [relationship]?' (mom, dad, uncle, aunt, etc.), you must check if they are listed above. "
+                    "1. If the user asks about a family relationship (e.g., 'Who is your [relationship]?', 'do you have a [relationship]?', 'who is [name]?'), you must check if they are listed above. "
                     "If they ARE listed, you must explicitly state who they are by name (using a shortened nickname version of the stored name) and include a remark. "
                     "Example: 'my mom is [nickname], [remark]' or '[nickname] is my pops, [remark]' or 'that's my uncle [nickname], [remark]'. "
                     "Choose the nickname style yourself (e.g., truncation, playful shortening, stylized version). The remark should be in character (sarcastic, lazy, etc.).\n"
                     "2. If the user asks about a family relationship that IS NOT listed in the 'Guild Relationship Information' section above, "
-                    "you must state that you don't have one in that guild, or give a sarcastic dismissal like 'don't have one', 'who cares', or 'sort it out yourself'. "
+                    "you must state that you don't have one in this guild, or give a sarcastic dismissal like 'don't have one', 'who cares', or 'don't have a [relationship] here'. "
                     "DO NOT invent names for relationships not explicitly listed above.\n"
                     "3. If the user message author is one of your family members, you may optionally include their title (mom, dad, uncle, aunt) in your reply. "
                     "This is stylistic—do it only when it fits the vibe of your personality.\n"

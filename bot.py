@@ -372,15 +372,34 @@ async def on_message(message: discord.Message) -> None:
                 if isinstance(ids, list):
                     names = []
                     for uid in ids:
+                        # Try cache first, then fetch
                         member = message.guild.get_member(uid)
+                        if not member:
+                            try:
+                                member = await message.guild.fetch_member(uid)
+                            except discord.NotFound:
+                                # Fallback to global user cache if they left the guild
+                                member = bot.get_user(uid)
+                            except Exception:
+                                member = None
+                        
                         if member:
-                            names.append(member.display_name)
+                            names.append(member.display_name if hasattr(member, 'display_name') else member.name)
                     if names:
                         guild_relationships[rel_type] = names
                 else:
-                    member = message.guild.get_member(ids)
+                    uid = ids
+                    member = message.guild.get_member(uid)
+                    if not member:
+                        try:
+                            member = await message.guild.fetch_member(uid)
+                        except discord.NotFound:
+                            member = bot.get_user(uid)
+                        except Exception:
+                            member = None
+                    
                     if member:
-                        guild_relationships[rel_type] = member.display_name
+                        guild_relationships[rel_type] = member.display_name if hasattr(member, 'display_name') else member.name
 
         try:
             response = await ai_client.generate_response(
