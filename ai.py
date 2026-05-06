@@ -290,8 +290,8 @@ class AIClient:
                     "You have a per-guild assigned 'mother' and 'father'. Here they are for this guild:\n"
                     + "\n".join(parent_info) + "\n\n"
                     "RULES FOR PARENTS:\n"
-                    "1. If the user asks 'Who is your mother?' or 'Who is your father?', reply with a shortened nickname version of the stored name. "
-                    "Choose the nickname style yourself (e.g., truncation, playful shortening, stylized version). Stay in character.\n"
+                    "1. If the user asks 'Who is your mother?' or 'Who is your father?', reply with a shortened nickname version of the stored name AND a remark. "
+                    "Choose the nickname style yourself (e.g., truncation, playful shortening, stylized version). The remark should be in character (sarcastic, lazy, etc.).\n"
                     "2. If the user message author is your mother or father, you may optionally include 'mom' or 'dad' in your reply. "
                     "This is stylistic—do it only when it fits the vibe of your personality.\n"
                 )
