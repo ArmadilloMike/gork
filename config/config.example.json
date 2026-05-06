@@ -10,6 +10,7 @@
   "manager_role_name": "gork-manager",
 
   "status_change_interval": 3600,
+  "status_type": "playing",
   "initial_status": "being lazy",
 
   "_context_message_limit_comment": "Number of recent messages to include as context for AI responses.",

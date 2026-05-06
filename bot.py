@@ -90,14 +90,28 @@ async def change_status(bot: commands.Bot, state: BotState, ai_client: AIClient,
         new_status = custom_status
     else:
         new_status = await generate_status(ai_client, config)
-    await bot.change_presence(
-        activity=discord.Activity(
-            type=discord.ActivityType.listening,
-            name=new_status,
-        )
-    )
+
+    # Determine activity type
+    st_type = config.get("status_type", "listening").lower()
+    activity = None
+
+    if st_type == "playing":
+        activity = discord.Game(name=new_status)
+    elif st_type == "watching":
+        activity = discord.Activity(type=discord.ActivityType.watching, name=new_status)
+    elif st_type == "competing":
+        activity = discord.Activity(type=discord.ActivityType.competing, name=new_status)
+    elif st_type == "custom":
+        # Note: CustomActivity is often not visible for bots unless set specifically
+        # as a custom_status in some libraries, but discord.py supports it.
+        activity = discord.CustomActivity(name=new_status)
+    else:
+        # Default to listening
+        activity = discord.Activity(type=discord.ActivityType.listening, name=new_status)
+
+    await bot.change_presence(activity=activity)
     state.set_last_status_change(time.time())
-    log.info(f"Status changed to: {new_status}")
+    log.info(f"Status changed to: {new_status} (Type: {st_type})")
     return new_status
 
 
@@ -140,12 +154,11 @@ async def on_ready() -> None:
         log.info("Slash commands synced globally.")
 
     log.info(f"Gork is online as {bot.user} (ID: {bot.user.id})")
-    await bot.change_presence(
-        activity=discord.Activity(
-            type=discord.ActivityType.listening,
-            name=config.get("initial_status", "being lazy"),
-        )
-    )
+    
+    # Use change_status to set initial status with correct type
+    initial_status = config.get("initial_status", "being lazy")
+    await change_status(bot, state, ai_client, config, custom_status=initial_status)
+    
     # Set initial last status change if not set
     if state.last_status_change is None:
         state.set_last_status_change(time.time())
