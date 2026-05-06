@@ -175,7 +175,7 @@ class AIClient:
 
     # ── Memory Extraction ─────────────────────────────────────────────────────
 
-    async def extract_memories(self, user_message: str, author_name: str, context: list[str] | None = None, existing_memories: dict[str, str] | None = None) -> dict[str, str]:
+    async def extract_memories(self, user_message: str, author_name: str, context: list[Any] | None = None, existing_memories: dict[str, str] | None = None) -> dict[str, str]:
         """
         Analyze the interaction to extract facts or preferences about the user.
         Returns a dictionary of {key: value} pairs to be stored in memory.
@@ -196,7 +196,15 @@ class AIClient:
             # Prepare context for the extraction
             context_text = ""
             if context:
-                context_text = "## Recent Context\n" + "\n".join(context) + "\n\n"
+                lines = []
+                for entry in context:
+                    if isinstance(entry, str):
+                        lines.append(entry)
+                    elif isinstance(entry, dict):
+                        author = entry.get("author", "Unknown")
+                        content = entry.get("content", "")
+                        lines.append(f"{author}: {content}")
+                context_text = "## Recent Context\n" + "\n".join(lines) + "\n\n"
             
             memories_text = ""
             if existing_memories:

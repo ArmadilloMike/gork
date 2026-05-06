@@ -188,6 +188,9 @@ async def on_message(message: discord.Message) -> None:
     Trigger conditions:
       1. Message explicitly mentions @gork
       2. User replies to a message that contains @gork
+      3. (DMs only) Any message in a 1-to-1 DM
+      4. (Group chats) Messages that mention or reply to @gork
+      5. (Guilds) Messages in auto-respond channels
 
     Blacklist gates:
       - Blacklisted users    -> silently ignored
@@ -255,7 +258,8 @@ async def on_message(message: discord.Message) -> None:
                 log.warning(f"Failed to fetch referenced message: {e}")
         log.info(f"Reply-trigger from {message.author} -> '{user_text}'")
 
-    elif message.guild is None and not message.content.startswith("!"):
+    elif message.guild is None and message.channel.type == discord.ChannelType.private and not message.content.startswith("!"):
+        # Respond to any message in 1-to-1 DMs (but not commands)
         user_text = message.content.strip()
         user_text = process_emojis(user_text)
         trigger_type = "dm"
@@ -291,7 +295,12 @@ async def on_message(message: discord.Message) -> None:
     if message.guild:
         jump_url = f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}"
         channel_str = f"#{message.channel.name}"
+    elif message.guild is None and hasattr(message.channel, 'recipients') and len(message.channel.recipients) > 1:
+        # Group DM channel
+        jump_url = f"https://discord.com/channels/@me/{message.channel.id}/{message.id}"
+        channel_str = getattr(message.channel, 'name', None) or f"Group DM ({message.channel.id})"
     else:
+        # 1-to-1 DM
         jump_url = f"https://discord.com/channels/@me/{message.channel.id}/{message.id}"
         channel_str = "DM"
 

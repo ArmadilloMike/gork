@@ -153,3 +153,39 @@ def test_build_messages_with_relationships(mock_config):
     assert "Charlie" in rel_msg["content"]
     assert "Dave" in rel_msg["content"]
     assert "RULES FOR FAMILY" in rel_msg["content"]
+
+@pytest.mark.asyncio
+async def test_extract_memories_with_dict_context(mock_config):
+    client = AIClient(mock_config)
+    
+    context = [
+        {"author": "User1", "content": "Hello", "images": []},
+        {"author": "Gork", "content": "Whatever", "images": []}
+    ]
+    
+    mock_response_data = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"test_key": "test_value"}'
+                }
+            }
+        ]
+    }
+    
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.json = AsyncMock(return_value=mock_response_data)
+    mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_resp.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(return_value=mock_resp)
+    mock_session.close = AsyncMock()
+    mock_session.closed = False
+    
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        memories = await client.extract_memories("message", "User", context=context)
+        assert memories == {"test_key": "test_value"}
+        
+    await client.close()
