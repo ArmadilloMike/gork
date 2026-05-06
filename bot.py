@@ -12,7 +12,7 @@ import io
 import discord
 from discord.ext import commands
 
-from ai import AIClient
+from ai import AIClient, AICapacityError
 from image_gen import ImageGenClient
 from commands import register_commands
 from config_loader import load_config
@@ -391,6 +391,20 @@ async def on_message(message: discord.Message) -> None:
                 images=images if images else None,
                 guild_relationships=guild_relationships if guild_relationships else None,
             )
+        except AICapacityError as exc:
+            log.warning("wait a minute, the ai service is overloaded.")
+            if gork_log:
+                await gork_log.error(
+                    "AI service overloaded",
+                    exc=exc,
+                    guild_id=message.guild.id if message.guild else None,
+                    user=f"{message.author} ({message.author.id})",
+                    channel=channel_str,
+                    input=user_text[:200],
+                    jump_url=jump_url,
+                )
+            await message.reply("my brain is full right now. try again in a bit when i'm less popular.")
+            return
         except Exception as exc:
             log.exception("AI generation failed")
             if gork_log:

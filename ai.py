@@ -13,6 +13,12 @@ import aiohttp
 
 log = logging.getLogger("gork.ai")
 
+
+class AICapacityError(RuntimeError):
+    """Exception raised when the AI model is at capacity or temporarily unavailable."""
+    pass
+
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 HACKCLUB_API_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
 MODEL = "openai/gpt-5.2-pro"                   # Default Hack Club proxy model
@@ -90,8 +96,16 @@ class AIClient:
             async with session.post(self._api_url, json=payload) as resp:
                 if resp.status != 200:
                     body = await resp.text()
+                    if resp.status in (502, 503) or "at capacity" in body.lower() or "temporarily unavailable" in body.lower():
+                        raise AICapacityError(f"AI service overloaded (HTTP {resp.status}): {body[:200]}")
                     raise RuntimeError(f"AI API error: {body[:300]}")
                 data: dict[str, Any] = await resp.json()
+                # Check for error in JSON response
+                if "error" in data:
+                    err_msg = data["error"].get("message", "").lower()
+                    if "at capacity" in err_msg or "temporarily unavailable" in err_msg:
+                        raise AICapacityError(f"AI service overloaded: {data['error'].get('message')}")
+
                 return self._parse_response(data)
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             log.error(f"Chat request failed: {exc}")
@@ -140,10 +154,20 @@ class AIClient:
             async with session.post(self._api_url, json=payload) as resp:
                 if resp.status == 200:
                     data = await resp.json()
+                    # Check for error in JSON response
+                    if "error" in data:
+                        err_msg = data["error"].get("message", "").lower()
+                        if "at capacity" in err_msg or "temporarily unavailable" in err_msg:
+                            raise AICapacityError(f"AI service overloaded: {data['error'].get('message')}")
+
                     content = self._parse_response(data)
                     if content.upper() == "NONE" or not content:
                         return None
                     return content
+                elif resp.status in (502, 503):
+                    body = await resp.text()
+                    if "at capacity" in body.lower() or "temporarily unavailable" in body.lower():
+                        raise AICapacityError(f"AI service overloaded (HTTP {resp.status}): {body[:200]}")
         except Exception as e:
             log.warning(f"Failed to detect image intent: {e}")
             
@@ -391,11 +415,19 @@ class AIClient:
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()
+                        if resp.status in (502, 503) or "at capacity" in body.lower() or "temporarily unavailable" in body.lower():
+                            raise AICapacityError(f"AI service overloaded (HTTP {resp.status}): {body[:200]}")
                         raise RuntimeError(
                             f"Hack Club AI returned HTTP {resp.status}: {body[:300]}"
                         )
 
                     data: dict[str, Any] = await resp.json()
+                    # Check for error in JSON response
+                    if "error" in data:
+                        err_msg = data["error"].get("message", "").lower()
+                        if "at capacity" in err_msg or "temporarily unavailable" in err_msg:
+                            raise AICapacityError(f"AI service overloaded: {data['error'].get('message')}")
+
                     return self._parse_response(data)
 
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:

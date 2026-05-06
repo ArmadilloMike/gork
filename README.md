@@ -120,35 +120,35 @@ gork/
 
 ## 🎮 How to Trigger Gork
 
-| Trigger | Example | Notes |
-|---------|-------------|-------|
-| **Direct Mention** | `@Gork what is recursion?` | Works in servers and DMs |
-| **Reply** | *Replies to Gork's message* | Includes conversation context |
-| **Direct Message** | `hey gork` | No @mention required in DMs |
-| **Implicit Image Request** | `draw me a robot cat` | Auto-detects intent to generate images |
+| Trigger                    | Example                     | Notes                                  |
+|----------------------------|-----------------------------|----------------------------------------|
+| **Direct Mention**         | `@Gork what is recursion?`  | Works in servers and DMs               |
+| **Reply**                  | *Replies to Gork's message* | Includes conversation context          |
+| **Direct Message**         | `hey gork`                  | No @mention required in DMs            |
+| **Implicit Image Request** | `draw me a robot cat`       | Auto-detects intent to generate images |
 
 ---
 
 ## ⌨️ Slash Commands
 
-| Command | Description | Permission |
-|---------|-------------|------------|
-| `/imagine <prompt>` | Generate an AI image | Public |
-| `/gork help` | Show help menu | Public |
-| `/status set <text>` | Update bot status message | Manager |
-| `/status refresh` | Prompt Gork to generate a new status immediately | Manager |
-| `/blacklist add <user/channel>` | Block interaction | Manager |
-| `/blacklist remove <user/channel>` | Unblock interaction | Manager |
-| `/blacklist list` | Show all blocks | Manager |
-| `/whitelist on/off <channel>` | Toggle whitelist mode | Manager |
-| `/auto_respond add/remove <channel>` | Toggle always-respond mode | Manager |
-| `/auto_respond list` | Show always-respond channels | Manager |
-| `/memory remember <user> <key> <val>` | Save user fact | Manager |
-| `/memory recall <user> <key>` | Get user fact | Manager |
-| `/relationship set <type> <user>` | Set guild relationship (mother, father, uncle, aunt) | Manager |
-| `/relationship clear <type> [user]` | Remove guild relationship(s) | Manager |
-| `/set_log_channel <channel>` | Set Discord log output | Manager |
-| `/gork enable/disable` | Global bot toggle | Manager |
+| Command                               | Description                                          | Permission |
+|---------------------------------------|------------------------------------------------------|------------|
+| `/imagine <prompt>`                   | Generate an AI image                                 | Public     |
+| `/gork help`                          | Show help menu                                       | Public     |
+| `/status set <text>`                  | Update bot status message                            | Manager    |
+| `/status refresh`                     | Prompt Gork to generate a new status immediately     | Manager    |
+| `/blacklist add <user/channel>`       | Block interaction                                    | Manager    |
+| `/blacklist remove <user/channel>`    | Unblock interaction                                  | Manager    |
+| `/blacklist list`                     | Show all blocks                                      | Manager    |
+| `/whitelist on/off <channel>`         | Toggle whitelist mode                                | Manager    |
+| `/auto_respond add/remove <channel>`  | Toggle always-respond mode                           | Manager    |
+| `/auto_respond list`                  | Show always-respond channels                         | Manager    |
+| `/memory remember <user> <key> <val>` | Save user fact                                       | Manager    |
+| `/memory recall <user> <key>`         | Get user fact                                        | Manager    |
+| `/relationship set <type> <user>`     | Set guild relationship (mother, father, uncle, aunt) | Manager    |
+| `/relationship clear <type> [user]`   | Remove guild relationship(s)                         | Manager    |
+| `/set_log_channel <channel>`          | Set Discord log output                               | Manager    |
+| `/gork enable/disable`                | Global bot toggle                                    | Manager    |
 
 > **Note**: Manager commands require the role specified in `manager_role_name` (default: `gork-manager`).
 
@@ -158,15 +158,15 @@ gork/
 
 Personality is 100% decoupled from code. Edit `config/config.json` to change Gork's soul:
 
-| Field | Description |
-|-------|-------------|
-| `name` | Bot's name in prompts |
-| `description` | Core backstory & identity |
-| `tone` | Emotional register and voice |
-| `temperature` | Randomness (0.0 to 1.0) |
-| `style_rules` | List of formatting/writing rules |
+| Field                   | Description                           |
+|-------------------------|---------------------------------------|
+| `name`                  | Bot's name in prompts                 |
+| `description`           | Core backstory & identity             |
+| `tone`                  | Emotional register and voice          |
+| `temperature`           | Randomness (0.0 to 1.0)               |
+| `style_rules`           | List of formatting/writing rules      |
 | `behavioral_tendencies` | How Gork acts in different situations |
-| `response_formatting` | Length, structure, markdown rules |
+| `response_formatting`   | Length, structure, markdown rules     |
 
 ---
 
