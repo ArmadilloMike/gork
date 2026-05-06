@@ -436,7 +436,7 @@ async def on_message(message: discord.Message) -> None:
                     input=user_text[:200],
                     jump_url=jump_url,
                 )
-            await message.reply("Something went wrong while thinking. Try again in a moment.")
+            await message.reply("im having trouble thinking, try again in like a minute")
             return
 
     chunks = split_long_message(response)
