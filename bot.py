@@ -141,14 +141,21 @@ async def on_ready() -> None:
         _commands_registered = True
 
     # Sync slash commands.
-    # If 'sync_guild_id' is set in config, sync to that guild instantly (dev mode).
+    # If 'sync_guild_id' is set in config, sync to that guild(s) instantly (dev mode).
     # Otherwise, sync globally (up to 1 hour to propagate on first run).
-    guild_id: int | None = config.get("sync_guild_id")
-    if guild_id:
-        guild_obj = discord.Object(id=guild_id)
-        bot.tree.copy_global_to(guild=guild_obj)
-        await bot.tree.sync(guild=guild_obj)
-        log.info(f"Slash commands synced to guild {guild_id} (dev mode).")
+    sync_guild_id = config.get("sync_guild_id")
+    if sync_guild_id:
+        # Support both a single ID and a list of IDs
+        guild_ids = sync_guild_id if isinstance(sync_guild_id, list) else [sync_guild_id]
+        
+        for g_id in guild_ids:
+            try:
+                guild_obj = discord.Object(id=int(g_id))
+                bot.tree.copy_global_to(guild=guild_obj)
+                await bot.tree.sync(guild=guild_obj)
+                log.info(f"Slash commands synced to guild {g_id} (dev mode).")
+            except Exception as e:
+                log.error(f"Failed to sync slash commands to guild {g_id}: {e}")
     else:
         await bot.tree.sync()
         log.info("Slash commands synced globally.")
