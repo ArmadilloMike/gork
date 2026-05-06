@@ -24,7 +24,7 @@ _DEFAULT_STATE: dict[str, Any] = {
     "bot_enabled": True,         # bool — Whether Gork responds to messages
     "log_channels": {},          # dict[str, int] — Guild ID -> log channel ID
     "last_status_change": None,  # float | None — timestamp of last status change
-    "guild_parents": {},         # dict[str, dict[str, int]] — Guild ID -> {"mother": id, "father": id}
+    "guild_relationships": {},   # dict[str, dict[str, int|list[int]]] — Guild ID -> {"mother": id, "father": id, "uncles": [ids], "aunts": [ids]}
 }
 
 
@@ -46,6 +46,10 @@ def _load_raw() -> dict[str, Any]:
                 data["log_channels"] = {"legacy": data["log_channel_id"]}
             del data["log_channel_id"]
 
+        # Migration: guild_parents to guild_relationships
+        if "guild_parents" in data:
+            data["guild_relationships"] = data.pop("guild_parents")
+
         # Backfill any keys added in later versions
         for key, default in _DEFAULT_STATE.items():
             data.setdefault(key, default)
@@ -64,6 +68,10 @@ def _load_raw() -> dict[str, Any]:
             if data["log_channel_id"] is not None and "log_channels" not in data:
                 data["log_channels"] = {"legacy": data["log_channel_id"]}
             del data["log_channel_id"]
+
+        # Migration: guild_parents to guild_relationships
+        if "guild_parents" in data:
+            data["guild_relationships"] = data.pop("guild_parents")
 
         # Backfill any keys added in later versions
         for key, default in _DEFAULT_STATE.items():
@@ -316,42 +324,67 @@ class BotState:
     def last_status_change(self) -> float | None:
         return self._data.get("last_status_change")
 
-    # ── Guild Parents ────────────────────────────────────────────────────────────
+    # ── Guild Relationships ──────────────────────────────────────────────────────
 
-    def set_guild_mother(self, guild_id: int, user_id: int | None) -> None:
-        """Set or clear the mother for a specific guild."""
+    def set_guild_relationship(self, guild_id: int, rel_type: str, user_id: int | None) -> None:
+        """Set or clear a relationship for a specific guild."""
         gid = str(guild_id)
-        if gid not in self._data["guild_parents"]:
-            self._data["guild_parents"][gid] = {}
-        if user_id is None:
-            if "mother" in self._data["guild_parents"][gid]:
-                del self._data["guild_parents"][gid]["mother"]
-        else:
-            self._data["guild_parents"][gid]["mother"] = user_id
+        if gid not in self._data["guild_relationships"]:
+            self._data["guild_relationships"][gid] = {}
+        
+        rel_data = self._data["guild_relationships"][gid]
+        
+        if rel_type in ("mother", "father"):
+            if user_id is None:
+                if rel_type in rel_data:
+                    del rel_data[rel_type]
+            else:
+                rel_data[rel_type] = user_id
+        elif rel_type in ("uncle", "aunt"):
+            plural_type = f"{rel_type}s"
+            if plural_type not in rel_data:
+                rel_data[plural_type] = []
+            
+            if user_id is not None:
+                if user_id not in rel_data[plural_type]:
+                    rel_data[plural_type].append(user_id)
         
         # Clean up empty guild entry
-        if not self._data["guild_parents"][gid]:
-            del self._data["guild_parents"][gid]
+        if not self._data["guild_relationships"][gid]:
+            del self._data["guild_relationships"][gid]
             
         self._save()
 
-    def set_guild_father(self, guild_id: int, user_id: int | None) -> None:
-        """Set or clear the father for a specific guild."""
+    def remove_guild_relationship(self, guild_id: int, rel_type: str, user_id: int | None = None) -> None:
+        """Remove a specific user or all users from a relationship type."""
         gid = str(guild_id)
-        if gid not in self._data["guild_parents"]:
-            self._data["guild_parents"][gid] = {}
-        if user_id is None:
-            if "father" in self._data["guild_parents"][gid]:
-                del self._data["guild_parents"][gid]["father"]
-        else:
-            self._data["guild_parents"][gid]["father"] = user_id
+        if gid not in self._data["guild_relationships"]:
+            return
 
+        rel_data = self._data["guild_relationships"][gid]
+        
+        if rel_type in ("mother", "father"):
+            if rel_type in rel_data:
+                del rel_data[rel_type]
+        elif rel_type in ("uncle", "aunt"):
+            plural_type = f"{rel_type}s"
+            if plural_type in rel_data:
+                if user_id is None:
+                    del rel_data[plural_type]
+                else:
+                    try:
+                        rel_data[plural_type].remove(user_id)
+                        if not rel_data[plural_type]:
+                            del rel_data[plural_type]
+                    except ValueError:
+                        pass
+        
         # Clean up empty guild entry
-        if not self._data["guild_parents"][gid]:
-            del self._data["guild_parents"][gid]
+        if not self._data["guild_relationships"][gid]:
+            del self._data["guild_relationships"][gid]
 
         self._save()
 
-    def get_guild_parents(self, guild_id: int) -> dict[str, int]:
-        """Get the mother and father IDs for a guild."""
-        return dict(self._data["guild_parents"].get(str(guild_id), {}))
+    def get_guild_relationships(self, guild_id: int) -> dict[str, Any]:
+        """Get all relationships for a guild."""
+        return dict(self._data["guild_relationships"].get(str(guild_id), {}))

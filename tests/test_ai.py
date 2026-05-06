@@ -89,14 +89,16 @@ async def test_ai_client_error_handling(mock_config):
     
     await client.close()
 
-def test_build_messages_with_parents(mock_config):
+def test_build_messages_with_relationships(mock_config):
     client = AIClient(mock_config)
-    guild_parents = {"mother": "Alice", "father": "Bob"}
-    messages = client._build_messages("hi", "User", guild_parents=guild_parents)
+    guild_relationships = {"mother": "Alice", "father": "Bob", "uncles": ["Charlie", "Dave"]}
+    messages = client._build_messages("hi", "User", guild_relationships=guild_relationships)
     
-    # Second message should be the parent information
-    parent_msg = messages[1]
-    assert parent_msg["role"] == "system"
-    assert "Alice" in parent_msg["content"]
-    assert "Bob" in parent_msg["content"]
-    assert "RULES FOR PARENTS" in parent_msg["content"]
+    # Second message should be the relationship information
+    rel_msg = messages[1]
+    assert rel_msg["role"] == "system"
+    assert "Alice" in rel_msg["content"]
+    assert "Bob" in rel_msg["content"]
+    assert "Charlie" in rel_msg["content"]
+    assert "Dave" in rel_msg["content"]
+    assert "RULES FOR FAMILY" in rel_msg["content"]

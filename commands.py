@@ -725,83 +725,81 @@ def register_commands(
 
     tree.add_command(status_group)
 
-    # ── Parent management commands ───────────────────────────────────────────
+    # ── Relationship management commands ───────────────────────────────────────────
 
-    @tree.command(name="setmother", description="Set the guild's mother.")
-    @app_commands.describe(user="The user who will be the guild's mother.")
-    async def set_mother(interaction: discord.Interaction, user: discord.Member) -> None:
+    relationship_group = app_commands.Group(name="relationship", description="Manage Gork's per-guild relationships.")
+
+    @relationship_group.command(name="set", description="Set a guild relationship (mother, father, uncle, aunt).")
+    @app_commands.describe(
+        type="The relationship type.",
+        user="The user to assign."
+    )
+    @app_commands.choices(type=[
+        app_commands.Choice(name="mother", value="mother"),
+        app_commands.Choice(name="father", value="father"),
+        app_commands.Choice(name="uncle", value="uncle"),
+        app_commands.Choice(name="aunt", value="aunt"),
+    ])
+    async def relationship_set(interaction: discord.Interaction, type: str, user: discord.Member) -> None:
         if not interaction.guild:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
         if not has_manager_role(interaction, role_name):
-            await _deny(interaction, gork_log, "setmother")
+            await _deny(interaction, gork_log, f"relationship set {type}")
             return
 
-        state.set_guild_mother(interaction.guild.id, user.id)
-        await interaction.response.send_message(f"✅ {user.display_name} is now the guild's mother.", ephemeral=True)
+        state.set_guild_relationship(interaction.guild.id, type, user.id)
+        
+        if type in ("mother", "father"):
+            msg = f"✅ {user.display_name} is now the guild's {type}."
+        else:
+            msg = f"✅ {user.display_name} added as a guild {type}."
+            
+        await interaction.response.send_message(msg, ephemeral=True)
         await gork_log.mod(
-            "Mother set",
+            f"Relationship set: {type}",
             guild_id=interaction.guild.id,
             user=f"{user} ({user.id})",
             by=f"{interaction.user} ({interaction.user.id})",
             guild=str(interaction.guild),
         )
 
-    @tree.command(name="setfather", description="Set the guild's father.")
-    @app_commands.describe(user="The user who will be the guild's father.")
-    async def set_father(interaction: discord.Interaction, user: discord.Member) -> None:
+    @relationship_group.command(name="clear", description="Clear a guild relationship.")
+    @app_commands.describe(
+        type="The relationship type to clear.",
+        user="The specific user to remove (optional, for uncle/aunt)."
+    )
+    @app_commands.choices(type=[
+        app_commands.Choice(name="mother", value="mother"),
+        app_commands.Choice(name="father", value="father"),
+        app_commands.Choice(name="uncle", value="uncle"),
+        app_commands.Choice(name="aunt", value="aunt"),
+    ])
+    async def relationship_clear(interaction: discord.Interaction, type: str, user: discord.Member | None = None) -> None:
         if not interaction.guild:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
         if not has_manager_role(interaction, role_name):
-            await _deny(interaction, gork_log, "setfather")
+            await _deny(interaction, gork_log, f"relationship clear {type}")
             return
 
-        state.set_guild_father(interaction.guild.id, user.id)
-        await interaction.response.send_message(f"✅ {user.display_name} is now the guild's father.", ephemeral=True)
+        state.remove_guild_relationship(interaction.guild.id, type, user.id if user else None)
+        
+        if user:
+            msg = f"✅ {user.display_name} removed from guild {type}s."
+        else:
+            msg = f"✅ Guild {type}(s) cleared."
+            
+        await interaction.response.send_message(msg, ephemeral=True)
         await gork_log.mod(
-            "Father set",
+            f"Relationship cleared: {type}",
             guild_id=interaction.guild.id,
-            user=f"{user} ({user.id})",
+            user=f"{user} ({user.id})" if user else "ALL",
             by=f"{interaction.user} ({interaction.user.id})",
             guild=str(interaction.guild),
         )
 
-    @tree.command(name="clearmother", description="Clear the guild's mother.")
-    async def clear_mother(interaction: discord.Interaction) -> None:
-        if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-        if not has_manager_role(interaction, role_name):
-            await _deny(interaction, gork_log, "clearmother")
-            return
-
-        state.set_guild_mother(interaction.guild.id, None)
-        await interaction.response.send_message("✅ Guild's mother cleared.", ephemeral=True)
-        await gork_log.mod(
-            "Mother cleared",
-            guild_id=interaction.guild.id,
-            by=f"{interaction.user} ({interaction.user.id})",
-            guild=str(interaction.guild),
-        )
-
-    @tree.command(name="clearfather", description="Clear the guild's father.")
-    async def clear_father(interaction: discord.Interaction) -> None:
-        if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-        if not has_manager_role(interaction, role_name):
-            await _deny(interaction, gork_log, "clearfather")
-            return
-
-        state.set_guild_father(interaction.guild.id, None)
-        await interaction.response.send_message("✅ Guild's father cleared.", ephemeral=True)
-        await gork_log.mod(
-            "Father cleared",
-            guild_id=interaction.guild.id,
-            by=f"{interaction.user} ({interaction.user.id})",
-            guild=str(interaction.guild),
-        )
+    tree.add_command(relationship_group)
 
 # ── Shared denial helper ──────────────────────────────────────────────────────
 

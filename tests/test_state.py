@@ -65,31 +65,48 @@ def test_bot_enabled_toggle(mock_state_path):
     state.set_bot_enabled(False)
     assert state.bot_enabled is False
 
-def test_guild_parents(mock_state_path):
+def test_guild_relationships(mock_state_path):
     state = BotState()
     guild_id = 777
     mother_id = 111
     father_id = 222
+    uncle_id = 333
+    aunt_id = 444
     
-    state.set_guild_mother(guild_id, mother_id)
-    state.set_guild_father(guild_id, father_id)
+    state.set_guild_relationship(guild_id, "mother", mother_id)
+    state.set_guild_relationship(guild_id, "father", father_id)
+    state.set_guild_relationship(guild_id, "uncle", uncle_id)
+    state.set_guild_relationship(guild_id, "aunt", aunt_id)
     
-    parents = state.get_guild_parents(guild_id)
-    assert parents["mother"] == mother_id
-    assert parents["father"] == father_id
+    rels = state.get_guild_relationships(guild_id)
+    assert rels["mother"] == mother_id
+    assert rels["father"] == father_id
+    assert rels["uncles"] == [uncle_id]
+    assert rels["aunts"] == [aunt_id]
     
     # Test persistence
     new_state = BotState()
-    parents = new_state.get_guild_parents(guild_id)
-    assert parents["mother"] == mother_id
-    assert parents["father"] == father_id
+    rels = new_state.get_guild_relationships(guild_id)
+    assert rels["mother"] == mother_id
+    assert rels["uncles"] == [uncle_id]
     
+    # Test multiple uncles
+    state.set_guild_relationship(guild_id, "uncle", 334)
+    rels = state.get_guild_relationships(guild_id)
+    assert 333 in rels["uncles"]
+    assert 334 in rels["uncles"]
+
     # Test clearing
-    state.set_guild_mother(guild_id, None)
-    parents = state.get_guild_parents(guild_id)
-    assert "mother" not in parents
-    assert parents["father"] == father_id
+    state.remove_guild_relationship(guild_id, "mother")
+    rels = state.get_guild_relationships(guild_id)
+    assert "mother" not in rels
     
-    state.set_guild_father(guild_id, None)
-    parents = state.get_guild_parents(guild_id)
-    assert parents == {}
+    # Test removing specific uncle
+    state.remove_guild_relationship(guild_id, "uncle", 333)
+    rels = state.get_guild_relationships(guild_id)
+    assert rels["uncles"] == [334]
+    
+    # Test clearing all uncles
+    state.remove_guild_relationship(guild_id, "uncle")
+    rels = state.get_guild_relationships(guild_id)
+    assert "uncles" not in rels
