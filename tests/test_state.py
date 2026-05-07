@@ -13,37 +13,41 @@ def mock_state_path(tmp_path):
 def test_bot_state_initialization(mock_state_path):
     state = BotState()
     assert state.bot_enabled is True
-    assert state.blacklisted_users == []
+    assert state.blacklisted_users() == []
 
 def test_blacklist_user(mock_state_path):
     state = BotState()
     user_id = 12345
+    guild_id = 67890
     
-    assert state.blacklist_user(user_id) is True
-    assert user_id in state.blacklisted_users
-    assert state.is_user_blacklisted(user_id) is True
+    assert state.blacklist_user(guild_id, user_id) is True
+    assert user_id in state.blacklisted_users(guild_id)
+    assert state.is_user_blacklisted(user_id, guild_id) is True
+    assert state.is_user_blacklisted(user_id, 11111) is False # Different guild
     
     # Try blacklisting again
-    assert state.blacklist_user(user_id) is False
+    assert state.blacklist_user(guild_id, user_id) is False
 
 def test_unblacklist_user(mock_state_path):
     state = BotState()
     user_id = 12345
-    state.blacklist_user(user_id)
+    guild_id = 67890
+    state.blacklist_user(guild_id, user_id)
     
-    assert state.unblacklist_user(user_id) is True
-    assert user_id not in state.blacklisted_users
+    assert state.unblacklist_user(guild_id, user_id) is True
+    assert user_id not in state.blacklisted_users(guild_id)
     
     # Try unblacklisting again
-    assert state.unblacklist_user(user_id) is False
+    assert state.unblacklist_user(guild_id, user_id) is False
 
 def test_persistence(mock_state_path):
     state = BotState()
-    state.blacklist_user(111)
+    guild_id = 67890
+    state.blacklist_user(guild_id, 111)
     
     # Create a new instance, should load from the same (mocked) path
     new_state = BotState()
-    assert 111 in new_state.blacklisted_users
+    assert 111 in new_state.blacklisted_users(guild_id)
 
 def test_user_memory(mock_state_path):
     state = BotState()
@@ -110,3 +114,27 @@ def test_guild_relationships(mock_state_path):
     state.remove_guild_relationship(guild_id, "uncle")
     rels = state.get_guild_relationships(guild_id)
     assert "uncles" not in rels
+
+def test_migration_and_global_blacklist(mock_state_path):
+    # Create a legacy state with lists
+    legacy_data = {
+        "blacklisted_users": [111],
+        "blacklisted_channels": [222],
+        "whitelisted_channels": [333]
+    }
+    with mock_state_path.open("w", encoding="utf-8") as f:
+        json.dump(legacy_data, f)
+    
+    state = BotState()
+    
+    # Check if migrated to 'global'
+    assert state.is_user_blacklisted(111) is True # No guild_id provided, checks global
+    assert state.is_user_blacklisted(111, 999) is True # Checks global even if guild_id provided
+    assert state.is_channel_blacklisted(222) is True
+    assert state.is_channel_whitelisted(333) is True
+    
+    # Check guild-specific
+    state.blacklist_user(999, 444)
+    assert state.is_user_blacklisted(444, 999) is True
+    assert state.is_user_blacklisted(444, 888) is False
+    assert state.is_user_blacklisted(444) is False # Global check

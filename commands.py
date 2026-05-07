@@ -78,7 +78,7 @@ def register_commands(
             await _deny(interaction, gork_log, "blacklist add user")
             return
 
-        added = state.blacklist_user(user.id)
+        added = state.blacklist_user(interaction.guild.id if interaction.guild else None, user.id)
         if added:
             msg = f"✅ **{user.display_name}** (`{user.id}`) has been blacklisted."
             await interaction.response.send_message(msg, ephemeral=True)
@@ -105,7 +105,7 @@ def register_commands(
             await _deny(interaction, gork_log, "blacklist add channel")
             return
 
-        added = state.blacklist_channel(channel.id)
+        added = state.blacklist_channel(interaction.guild.id if interaction.guild else None, channel.id)
         if added:
             msg = f"✅ {channel.mention} has been blacklisted."
             await interaction.response.send_message(msg, ephemeral=True)
@@ -139,7 +139,7 @@ def register_commands(
             await _deny(interaction, gork_log, "blacklist remove user")
             return
 
-        removed = state.unblacklist_user(user.id)
+        removed = state.unblacklist_user(interaction.guild.id if interaction.guild else None, user.id)
         if removed:
             msg = f"✅ **{user.display_name}** has been removed from the blacklist."
             await interaction.response.send_message(msg, ephemeral=True)
@@ -164,7 +164,7 @@ def register_commands(
             await _deny(interaction, gork_log, "blacklist remove channel")
             return
 
-        removed = state.unblacklist_channel(channel.id)
+        removed = state.unblacklist_channel(interaction.guild.id if interaction.guild else None, channel.id)
         if removed:
             msg = f"✅ {channel.mention} has been removed from the blacklist."
             await interaction.response.send_message(msg, ephemeral=True)
@@ -190,8 +190,8 @@ def register_commands(
             await _deny(interaction, gork_log, "blacklist list")
             return
 
-        users = state.blacklisted_users
-        channels = state.blacklisted_channels
+        users = state.blacklisted_users(interaction.guild.id if interaction.guild else None)
+        channels = state.blacklisted_channels(interaction.guild.id if interaction.guild else None)
 
         embed = discord.Embed(title="🚫 Gork Blacklist", color=discord.Color.dark_red())
 
@@ -237,7 +237,7 @@ def register_commands(
             await _deny(interaction, gork_log, "whitelist on")
             return
 
-        added = state.whitelist_channel(channel.id)
+        added = state.whitelist_channel(interaction.guild.id if interaction.guild else None, channel.id)
         if added:
             msg = f"✅ {channel.mention} has been whitelisted."
             await interaction.response.send_message(msg, ephemeral=True)
@@ -264,7 +264,7 @@ def register_commands(
             await _deny(interaction, gork_log, "whitelist off")
             return
 
-        removed = state.unwhitelist_channel(channel.id)
+        removed = state.unwhitelist_channel(interaction.guild.id if interaction.guild else None, channel.id)
         if removed:
             msg = f"✅ {channel.mention} has been removed from the whitelist."
             await interaction.response.send_message(msg, ephemeral=True)
@@ -288,7 +288,7 @@ def register_commands(
             await _deny(interaction, gork_log, "whitelist list")
             return
 
-        channels = state.whitelisted_channels
+        channels = state.whitelisted_channels(interaction.guild.id if interaction.guild else None)
 
         embed = discord.Embed(title="✅ Gork Whitelist", color=discord.Color.green())
 

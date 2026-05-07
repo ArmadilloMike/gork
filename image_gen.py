@@ -135,7 +135,7 @@ class ImageGenClient:
         """
         loop = asyncio.get_running_loop()
         try:
-            return await loop.run_in_executor(None, _extract_image_bytes_sync, data)
+            return await loop.run_in_executor(None, ImageGenClient._extract_image_bytes_sync, data)
         except (KeyError, IndexError, TypeError) as exc:
             log.error(f"Unexpected image response shape: {data}")
             raise RuntimeError(f"Could not parse image response: {exc}") from exc

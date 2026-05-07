@@ -205,11 +205,11 @@ async def on_message(message: discord.Message) -> None:
         return
 
     # ── Blacklist: channel ────────────────────────────────────────────────────
-    if state.is_channel_blacklisted(message.channel.id):
+    if state.is_channel_blacklisted(message.channel.id, message.guild.id if message.guild else None):
         return
 
     # ── Whitelist: channel ────────────────────────────────────────────────────
-    if state.whitelisted_channels and not state.is_channel_whitelisted(message.channel.id):
+    if state.has_any_whitelisted_channels(message.guild.id if message.guild else None) and not state.is_channel_whitelisted(message.channel.id, message.guild.id if message.guild else None):
         return
 
     # ── Bot enabled ────────────────────────────────────────────────────────────
@@ -217,7 +217,7 @@ async def on_message(message: discord.Message) -> None:
         return
 
     # ── Blacklist: user ───────────────────────────────────────────────────────
-    if state.is_user_blacklisted(message.author.id):
+    if state.is_user_blacklisted(message.author.id, message.guild.id if message.guild else None):
         # Only log when the blacklisted user actually tried to trigger Gork,
         # not on every message they send in the server.
         is_attempt = (

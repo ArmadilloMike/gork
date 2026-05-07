@@ -29,16 +29,17 @@ def test_split_long_message_with_newline():
     assert chunks[0] == "line1"
     assert chunks[1] == "a" * 1995
 
-def test_image_to_base64():
+@pytest.mark.asyncio
+async def test_image_to_base64():
     # Create a small dummy image
     file = BytesIO()
     image = Image.new('RGB', (10, 10))
     image.save(file, 'PNG')
     image_bytes = file.getvalue()
     
-    encoded = image_to_base64(image_bytes)
+    encoded = await image_to_base64(image_bytes)
     assert encoded is not None
     assert isinstance(encoded, str)
     
     # Try invalid bytes
-    assert image_to_base64(b"not an image") is None
+    assert await image_to_base64(b"not an image") is None

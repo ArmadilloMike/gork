@@ -16,9 +16,9 @@ STATE_PATH = Path(__file__).parent / "data" / "state.json"
 
 # Shape of the state file
 _DEFAULT_STATE: dict[str, Any] = {
-    "blacklisted_users": [],     # list[int]  — Discord user IDs
-    "blacklisted_channels": [],  # list[int]  — Discord channel IDs
-    "whitelisted_channels": [],  # list[int]  — Discord channel IDs
+    "blacklisted_users": {},     # dict[str, list[int]] — Guild ID -> list of user IDs
+    "blacklisted_channels": {},  # dict[str, list[int]] — Guild ID -> list of channel IDs
+    "whitelisted_channels": {},  # dict[str, list[int]] — Guild ID -> list of channel IDs
     "auto_respond_channels": {}, # dict[str, list[int]] — Guild ID -> list of channel IDs
     "user_memories": {},         # dict[int, dict[str, str]] — User memories
     "bot_enabled": True,         # bool — Whether Gork responds to messages
@@ -35,6 +35,11 @@ def _load_raw() -> dict[str, Any]:
     try:
         with STATE_PATH.open("r", encoding="utf-8") as fh:
             data = json.load(fh)
+
+        # Migration: blacklisted_users, blacklisted_channels, whitelisted_channels from list to dict
+        for key in ["blacklisted_users", "blacklisted_channels", "whitelisted_channels"]:
+            if isinstance(data.get(key), list):
+                data[key] = {"global": data[key]}
 
         # Migration: auto_respond_channels from list to dict
         if isinstance(data.get("auto_respond_channels"), list):
@@ -58,6 +63,11 @@ def _load_raw() -> dict[str, Any]:
         log.warning(f"Failed to decode '{STATE_PATH}' as UTF-8. Retrying with 'latin-1'...")
         with STATE_PATH.open("r", encoding="latin-1") as fh:
             data = json.load(fh)
+
+        # Migration: blacklisted_users, blacklisted_channels, whitelisted_channels from list to dict
+        for key in ["blacklisted_users", "blacklisted_channels", "whitelisted_channels"]:
+            if isinstance(data.get(key), list):
+                data[key] = {"global": data[key]}
 
         # Migration: auto_respond_channels from list to dict
         if isinstance(data.get("auto_respond_channels"), list):
@@ -116,87 +126,143 @@ class BotState:
 
     # ── Blacklist: users ──────────────────────────────────────────────────────
 
-    def blacklist_user(self, user_id: int) -> bool:
+    def blacklist_user(self, guild_id: int | None, user_id: int) -> bool:
         """
-        Add user_id to the blacklist.
+        Add user_id to the blacklist for a guild.
         Returns True if added, False if already present.
         """
-        if user_id in self._data["blacklisted_users"]:
+        gid = str(guild_id) if guild_id else "global"
+        if gid not in self._data["blacklisted_users"]:
+            self._data["blacklisted_users"][gid] = []
+
+        if user_id in self._data["blacklisted_users"][gid]:
             return False
-        self._data["blacklisted_users"].append(user_id)
+        self._data["blacklisted_users"][gid].append(user_id)
         self._save()
         return True
 
-    def unblacklist_user(self, user_id: int) -> bool:
+    def unblacklist_user(self, guild_id: int | None, user_id: int) -> bool:
         """
-        Remove user_id from the blacklist.
+        Remove user_id from the blacklist for a guild.
         Returns True if removed, False if not found.
         """
+        gid = str(guild_id) if guild_id else "global"
+        if gid not in self._data["blacklisted_users"]:
+            return False
         try:
-            self._data["blacklisted_users"].remove(user_id)
+            self._data["blacklisted_users"][gid].remove(user_id)
+            if not self._data["blacklisted_users"][gid]:
+                del self._data["blacklisted_users"][gid]
         except ValueError:
             return False
         self._save()
         return True
 
-    def is_user_blacklisted(self, user_id: int) -> bool:
-        return user_id in self._data["blacklisted_users"]
+    def is_user_blacklisted(self, user_id: int, guild_id: int | None = None) -> bool:
+        # Check global blacklist first
+        if user_id in self._data["blacklisted_users"].get("global", []):
+            return True
+        # Then check guild-specific blacklist
+        if guild_id:
+            return user_id in self._data["blacklisted_users"].get(str(guild_id), [])
+        return False
 
-    @property
-    def blacklisted_users(self) -> list[int]:
-        return list(self._data["blacklisted_users"])
+    def blacklisted_users(self, guild_id: int | None = None) -> list[int]:
+        if guild_id:
+            return list(self._data["blacklisted_users"].get(str(guild_id), []))
+        return list(self._data["blacklisted_users"].get("global", []))
 
     # ── Blacklist: channels ───────────────────────────────────────────────────
 
-    def blacklist_channel(self, channel_id: int) -> bool:
+    def blacklist_channel(self, guild_id: int | None, channel_id: int) -> bool:
         """Add channel_id. Returns True if added, False if already present."""
-        if channel_id in self._data["blacklisted_channels"]:
+        gid = str(guild_id) if guild_id else "global"
+        if gid not in self._data["blacklisted_channels"]:
+            self._data["blacklisted_channels"][gid] = []
+
+        if channel_id in self._data["blacklisted_channels"][gid]:
             return False
-        self._data["blacklisted_channels"].append(channel_id)
+        self._data["blacklisted_channels"][gid].append(channel_id)
         self._save()
         return True
 
-    def unblacklist_channel(self, channel_id: int) -> bool:
+    def unblacklist_channel(self, guild_id: int | None, channel_id: int) -> bool:
         """Remove channel_id. Returns True if removed, False if not found."""
+        gid = str(guild_id) if guild_id else "global"
+        if gid not in self._data["blacklisted_channels"]:
+            return False
         try:
-            self._data["blacklisted_channels"].remove(channel_id)
+            self._data["blacklisted_channels"][gid].remove(channel_id)
+            if not self._data["blacklisted_channels"][gid]:
+                del self._data["blacklisted_channels"][gid]
         except ValueError:
             return False
         self._save()
         return True
 
-    def is_channel_blacklisted(self, channel_id: int) -> bool:
-        return channel_id in self._data["blacklisted_channels"]
+    def is_channel_blacklisted(self, channel_id: int, guild_id: int | None = None) -> bool:
+        # Check global blacklist first
+        if channel_id in self._data["blacklisted_channels"].get("global", []):
+            return True
+        # Then check guild-specific blacklist
+        if guild_id:
+            return channel_id in self._data["blacklisted_channels"].get(str(guild_id), [])
+        return False
 
-    @property
-    def blacklisted_channels(self) -> list[int]:
-        return list(self._data["blacklisted_channels"])
+    def blacklisted_channels(self, guild_id: int | None = None) -> list[int]:
+        if guild_id:
+            return list(self._data["blacklisted_channels"].get(str(guild_id), []))
+        return list(self._data["blacklisted_channels"].get("global", []))
 
     # ── Whitelist: channels ───────────────────────────────────────────────────
 
-    def whitelist_channel(self, channel_id: int) -> bool:
+    def whitelist_channel(self, guild_id: int | None, channel_id: int) -> bool:
         """Add channel_id to whitelist. Returns True if added, False if already present."""
-        if channel_id in self._data["whitelisted_channels"]:
+        gid = str(guild_id) if guild_id else "global"
+        if gid not in self._data["whitelisted_channels"]:
+            self._data["whitelisted_channels"][gid] = []
+
+        if channel_id in self._data["whitelisted_channels"][gid]:
             return False
-        self._data["whitelisted_channels"].append(channel_id)
+        self._data["whitelisted_channels"][gid].append(channel_id)
         self._save()
         return True
 
-    def unwhitelist_channel(self, channel_id: int) -> bool:
+    def unwhitelist_channel(self, guild_id: int | None, channel_id: int) -> bool:
         """Remove channel_id from whitelist. Returns True if removed, False if not found."""
+        gid = str(guild_id) if guild_id else "global"
+        if gid not in self._data["whitelisted_channels"]:
+            return False
         try:
-            self._data["whitelisted_channels"].remove(channel_id)
+            self._data["whitelisted_channels"][gid].remove(channel_id)
+            if not self._data["whitelisted_channels"][gid]:
+                del self._data["whitelisted_channels"][gid]
         except ValueError:
             return False
         self._save()
         return True
 
-    def is_channel_whitelisted(self, channel_id: int) -> bool:
-        return channel_id in self._data["whitelisted_channels"]
+    def is_channel_whitelisted(self, channel_id: int, guild_id: int | None = None) -> bool:
+        # Check global whitelist first
+        if channel_id in self._data["whitelisted_channels"].get("global", []):
+            return True
+        # Then check guild-specific whitelist
+        if guild_id:
+            return channel_id in self._data["whitelisted_channels"].get(str(guild_id), [])
+        return False
 
-    @property
-    def whitelisted_channels(self) -> list[int]:
-        return list(self._data["whitelisted_channels"])
+    def whitelisted_channels(self, guild_id: int | None = None) -> list[int]:
+        if guild_id:
+            return list(self._data["whitelisted_channels"].get(str(guild_id), []))
+        return list(self._data["whitelisted_channels"].get("global", []))
+
+    def has_any_whitelisted_channels(self, guild_id: int | None = None) -> bool:
+        """Returns True if there are any whitelisted channels (global or for guild)."""
+        if self._data["whitelisted_channels"].get("global"):
+            return True
+        if guild_id and self._data["whitelisted_channels"].get(str(guild_id)):
+            return True
+        return False
 
     # ── Auto-respond: channels ────────────────────────────────────────────────
 
