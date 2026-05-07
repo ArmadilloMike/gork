@@ -6,6 +6,7 @@
 
   "model": "google/gemini-flash-1.5",
   "image_model": "google/gemini-2.5-flash-image",
+  "gork_owner": "YOUR_USER_ID_HERE",
 
   "manager_role_name": "gork-manager",
 

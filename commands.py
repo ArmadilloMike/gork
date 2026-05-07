@@ -28,10 +28,21 @@ def manager_role_name(config: dict) -> str:
     return config.get("manager_role_name", "gork-manager")
 
 
-def has_manager_role(interaction: discord.Interaction, role_name: str) -> bool:
-    """Return True if the invoking member has the manager role."""
+def has_manager_role(interaction: discord.Interaction, config: dict) -> bool:
+    """Return True if the invoking member has the manager role or is the gork_owner."""
+    # Check if the user is the configured gork_owner (accepts int or str ID)
+    owner_id = config.get("gork_owner")
+    if owner_id is not None:
+        try:
+            if interaction.user.id == int(owner_id):
+                return True
+        except (ValueError, TypeError):
+            pass
+
     if not isinstance(interaction.user, discord.Member):
         return False
+
+    role_name = manager_role_name(config)
     return any(
         r.name.lower() == role_name.lower()
         for r in interaction.user.roles
@@ -59,7 +70,7 @@ def register_commands(
 
     blacklist_group = app_commands.Group(
         name="blacklist",
-        description="Manage Gork's blacklist (requires gork-manager role).",
+        description="Manage Gork's blacklist.",
     )
 
     # ── /blacklist add user ───────────────────────────────────────────────────
@@ -74,7 +85,7 @@ def register_commands(
     async def blacklist_add_user(
         interaction: discord.Interaction, user: discord.Member
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "blacklist add user")
             return
 
@@ -101,7 +112,7 @@ def register_commands(
     async def blacklist_add_channel(
         interaction: discord.Interaction, channel: discord.TextChannel
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "blacklist add channel")
             return
 
@@ -135,7 +146,7 @@ def register_commands(
     async def blacklist_remove_user(
         interaction: discord.Interaction, user: discord.Member
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "blacklist remove user")
             return
 
@@ -160,7 +171,7 @@ def register_commands(
     async def blacklist_remove_channel(
         interaction: discord.Interaction, channel: discord.TextChannel
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "blacklist remove channel")
             return
 
@@ -186,7 +197,7 @@ def register_commands(
 
     @blacklist_group.command(name="list", description="Show all blacklisted users and channels.")
     async def blacklist_list(interaction: discord.Interaction) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "blacklist list")
             return
 
@@ -223,7 +234,7 @@ def register_commands(
 
     whitelist_group = app_commands.Group(
         name="whitelist",
-        description="Manage Gork's whitelist (requires gork-manager role).",
+        description="Manage Gork's whitelist.",
     )
 
     # ── /whitelist on channel ───────────────────────────────────────────────────
@@ -233,7 +244,7 @@ def register_commands(
     async def whitelist_on_channel(
         interaction: discord.Interaction, channel: discord.TextChannel
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "whitelist on")
             return
 
@@ -260,7 +271,7 @@ def register_commands(
     async def whitelist_off_channel(
         interaction: discord.Interaction, channel: discord.TextChannel
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "whitelist off")
             return
 
@@ -284,7 +295,7 @@ def register_commands(
 
     @whitelist_group.command(name="list", description="Show all whitelisted channels.")
     async def whitelist_list(interaction: discord.Interaction) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "whitelist list")
             return
 
@@ -310,7 +321,7 @@ def register_commands(
 
     auto_respond_group = app_commands.Group(
         name="auto_respond",
-        description="Manage channels where Gork always responds (requires gork-manager role).",
+        description="Manage channels where Gork always responds.",
     )
 
     @auto_respond_group.command(name="add", description="Set a channel where Gork will always respond to messages.")
@@ -318,7 +329,7 @@ def register_commands(
     async def auto_respond_add(
         interaction: discord.Interaction, channel: discord.TextChannel
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "auto_respond add")
             return
 
@@ -343,7 +354,7 @@ def register_commands(
     async def auto_respond_remove(
         interaction: discord.Interaction, channel: discord.TextChannel
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "auto_respond remove")
             return
 
@@ -365,7 +376,7 @@ def register_commands(
 
     @auto_respond_group.command(name="list", description="Show all auto-respond channels.")
     async def auto_respond_list(interaction: discord.Interaction) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "auto_respond list")
             return
 
@@ -391,7 +402,7 @@ def register_commands(
 
     memory_group = app_commands.Group(
         name="memory",
-        description="Manage Gork's memories about users (requires gork-manager role).",
+        description="Manage Gork's memories about users.",
     )
 
     # ── /memory remember ───────────────────────────────────────────────────────
@@ -403,7 +414,7 @@ def register_commands(
     async def memory_remember(
         interaction: discord.Interaction, user: discord.Member, key: str, value: str
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "memory remember")
             return
 
@@ -429,7 +440,7 @@ def register_commands(
     async def memory_recall(
         interaction: discord.Interaction, user: discord.Member, key: str
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "memory recall")
             return
 
@@ -448,7 +459,7 @@ def register_commands(
     @memory_group.command(name="list", description="List all memories for a user.")
     @app_commands.describe(user="The user whose memories to list.")
     async def memory_list(interaction: discord.Interaction, user: discord.Member) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "memory list")
             return
 
@@ -476,7 +487,7 @@ def register_commands(
     async def memory_forget(
         interaction: discord.Interaction, user: discord.Member, key: str
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "memory forget")
             return
 
@@ -504,14 +515,14 @@ def register_commands(
 
     gork_group = app_commands.Group(
         name="gork",
-        description="Control Gork's global behavior (requires gork-manager role).",
+        description="Control Gork's global behavior.",
     )
 
     # ── /gork enable ──────────────────────────────────────────────────────────
 
     @gork_group.command(name="enable", description="Enable Gork to respond to messages.")
     async def gork_enable(interaction: discord.Interaction) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "gork enable")
             return
 
@@ -532,7 +543,7 @@ def register_commands(
 
     @gork_group.command(name="disable", description="Disable Gork from responding to messages.")
     async def gork_disable(interaction: discord.Interaction) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "gork disable")
             return
 
@@ -558,7 +569,7 @@ def register_commands(
         description="Show how to use Gork and all available commands.",
     )
     async def gork_help(interaction: discord.Interaction) -> None:
-        is_manager = has_manager_role(interaction, role_name)
+        is_manager = has_manager_role(interaction, config)
 
         embed = discord.Embed(
             title="<:gork:0> Gork — Help",
@@ -643,7 +654,7 @@ def register_commands(
     async def set_log_channel(
         interaction: discord.Interaction, channel: discord.TextChannel
     ) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "setlogchannel")
             return
 
@@ -669,13 +680,13 @@ def register_commands(
 
     status_group = app_commands.Group(
         name="status",
-        description="Manage Gork's status (requires gork-manager role).",
+        description="Manage Gork's status.",
     )
 
     @status_group.command(name="set", description="Set Gork's status and reset the timer.")
     @app_commands.describe(status="The new status message.")
     async def status_set(interaction: discord.Interaction, status: str) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "status set")
             return
 
@@ -695,7 +706,7 @@ def register_commands(
 
     @status_group.command(name="refresh", description="Prompt Gork to generate a new status immediately.")
     async def status_refresh(interaction: discord.Interaction) -> None:
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, "status refresh")
             return
 
@@ -744,7 +755,7 @@ def register_commands(
         if not interaction.guild:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, f"relationship set {type}")
             return
 
@@ -779,7 +790,7 @@ def register_commands(
         if not interaction.guild:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
-        if not has_manager_role(interaction, role_name):
+        if not has_manager_role(interaction, config):
             await _deny(interaction, gork_log, f"relationship clear {type}")
             return
 
