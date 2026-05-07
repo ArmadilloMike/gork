@@ -384,6 +384,33 @@ class BotState:
             self._save()
         return cleared_count
 
+    def clear_all_for_guild(self, guild_id: int, member_ids: list[int]) -> int:
+        """
+        Wipe all guild-specific data: memories for members, relationships,
+        blacklists, whitelists, and auto-respond channels.
+        Returns the number of users whose memories were cleared.
+        """
+        gid_str = str(guild_id)
+        
+        # 1. Clear memories
+        memories_cleared = self.clear_memories_for_users(member_ids)
+        
+        # 2. Clear relationships
+        if gid_str in self._data["guild_relationships"]:
+            del self._data["guild_relationships"][gid_str]
+            
+        # 3. Clear blacklists/whitelists/auto-respond
+        for key in ["blacklisted_users", "blacklisted_channels", "whitelisted_channels", "auto_respond_channels"]:
+            if gid_str in self._data[key]:
+                del self._data[key][gid_str]
+                
+        # 4. Clear log channel
+        if gid_str in self._data["log_channels"]:
+            del self._data["log_channels"][gid_str]
+
+        self._save()
+        return memories_cleared
+
     # ── Bot enabled ────────────────────────────────────────────────────────────
 
     def set_bot_enabled(self, enabled: bool) -> None:

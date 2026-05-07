@@ -164,3 +164,39 @@ def test_clear_memories_for_users(mock_state_path):
     # Try clearing again (should be 0)
     count = state.clear_memories_for_users([user1, user2])
     assert count == 0
+
+def test_clear_all_for_guild(mock_state_path):
+    state = BotState()
+    guild_id = 999
+    user1 = 101
+    user2 = 102
+    
+    # Setup data for the guild
+    state.set_user_memory(user1, "trait", "funny")
+    state.set_user_memory(user2, "trait", "serious")
+    state.set_guild_relationship(guild_id, "mother", user1)
+    state.blacklist_user(guild_id, 666)
+    state.whitelist_channel(guild_id, 777)
+    state.add_auto_respond_channel(guild_id, 888)
+    state.set_log_channel(guild_id, 555)
+    
+    # Verify setup
+    assert state.get_user_memory(user1, "trait") == "funny"
+    assert state.get_guild_relationships(guild_id).get("mother") == user1
+    assert 666 in state.blacklisted_users(guild_id)
+    assert 777 in state.whitelisted_channels(guild_id)
+    assert 888 in state.get_auto_respond_channels(guild_id)
+    assert state.get_log_channel(guild_id) == 555
+    
+    # Clear all for guild
+    count = state.clear_all_for_guild(guild_id, [user1, user2])
+    assert count == 2
+    
+    # Verify cleared
+    assert state.get_user_memory(user1, "trait") is None
+    assert state.get_user_memory(user2, "trait") is None
+    assert state.get_guild_relationships(guild_id) == {}
+    assert state.blacklisted_users(guild_id) == []
+    assert state.whitelisted_channels(guild_id) == []
+    assert state.get_auto_respond_channels(guild_id) == []
+    assert state.get_log_channel(guild_id) is None

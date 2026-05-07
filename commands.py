@@ -937,9 +937,9 @@ def register_commands(
 
     tree.add_command(relationship_group)
 
-    @tree.command(name="clear-cache", description="Wipe all AI memories for members of this server.")
+    @tree.command(name="clear-cache", description="Wipe ALL data for this server (memories, relationships, settings).")
     async def clear_cache(interaction: discord.Interaction) -> None:
-        """Clear all memories for the current guild excluding relationships."""
+        """Clear everything for the current guild."""
         if not interaction.guild:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
@@ -950,8 +950,9 @@ def register_commands(
 
         view = ConfirmationView()
         await interaction.response.send_message(
-            "⚠️ **Warning:** This will wipe ALL AI memories for all members of this server. "
-            "Relationships will be preserved. Are you sure you want to proceed?",
+            "⚠️ **NUCLEAR OPTION:** This will wipe EVERYTHING for this server: AI memories, "
+            "relationships, blacklists, whitelists, and settings. This cannot be undone.\n"
+            "Are you absolutely sure?",
             view=view,
             ephemeral=True
         )
@@ -967,19 +968,19 @@ def register_commands(
             return
 
         # Update message to show progress
-        await interaction.edit_original_response(content="⏳ Clearing memories...", view=None)
+        await interaction.edit_original_response(content="⏳ Wiping EVERYTHING...", view=None)
 
         # Collect all member IDs.
         member_ids = [m.id for m in interaction.guild.members]
         
-        count = state.clear_memories_for_users(member_ids)
+        count = state.clear_all_for_guild(interaction.guild.id, member_ids)
 
         await interaction.edit_original_response(
-            content=f"✅ Cleared memories for {count} users in this server. (Relationships preserved)"
+            content=f"✅ Wiped all data for this server. ({count} users' memories cleared)"
         )
 
         await gork_log.mod(
-            "Cache cleared",
+            "Everything cleared",
             guild_id=interaction.guild.id,
             by=f"{interaction.user} ({interaction.user.id})",
             users_cleared=count,
