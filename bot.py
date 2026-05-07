@@ -267,7 +267,9 @@ async def on_message(message: discord.Message) -> None:
 
     elif message.content.lower().startswith("gork:"):
         # Strip "gork:" prefix and treat as a direct trigger
-        user_text = message.content[5:].strip()
+        user_text = message.content
+        while user_text.lower().startswith("gork:"):
+            user_text = user_text[5:].strip()
         user_text = process_emojis(user_text)
         if not user_text:
             user_text = "hey"
@@ -428,6 +430,11 @@ async def on_message(message: discord.Message) -> None:
                 images=images if images else None,
                 guild_relationships=guild_relationships if guild_relationships else None,
             )
+            
+            # Clean "Gork:" or "gork:" prefix from the response
+            while response.lower().startswith("gork:"):
+                response = response[5:].strip()
+                
         except AICapacityError as exc:
             log.warning("wait a minute, the ai service is overloaded.")
             if gork_log:
