@@ -200,8 +200,8 @@ async def on_message(message: discord.Message) -> None:
     if message.author.bot:
         return
 
-    # Ignore messages starting with ~~ or gork: (Gork ignore prefixes)
-    if message.content.lower().startswith(("~~", "gork:")):
+    # Ignore messages starting with ~~ (Gork ignore prefix)
+    if message.content.startswith("~~"):
         return
 
     # ── Blacklist: channel ────────────────────────────────────────────────────
@@ -264,6 +264,15 @@ async def on_message(message: discord.Message) -> None:
         user_text = process_emojis(user_text)
         trigger_type = "dm"
         log.info(f"DM from {message.author} -> '{user_text}'")
+
+    elif message.content.lower().startswith("gork:"):
+        # Strip "gork:" prefix and treat as a direct trigger
+        user_text = message.content[5:].strip()
+        user_text = process_emojis(user_text)
+        if not user_text:
+            user_text = "hey"
+        trigger_type = "prefix"
+        log.info(f"Prefix trigger from {message.author} -> '{user_text}'")
 
     elif state.is_auto_respond_channel(message.channel.id, message.guild.id if message.guild else None):
         user_text = message.content.strip()
