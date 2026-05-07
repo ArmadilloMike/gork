@@ -200,8 +200,8 @@ async def on_message(message: discord.Message) -> None:
     if message.author.bot:
         return
 
-    # Ignore messages starting with ## (Gork ignore prefix)
-    if message.content.startswith("~~"):
+    # Ignore messages starting with ~~ or gork: (Gork ignore prefixes)
+    if message.content.lower().startswith(("~~", "gork:")):
         return
 
     # ── Blacklist: channel ────────────────────────────────────────────────────
