@@ -343,28 +343,42 @@ class AIClient:
             messages.append({"role": "system", "content": f"## User Memories\n" + "\n".join(mem_lines) + "\n\n"})
 
         if context:
-            # Build context content which may include images
-            context_content: list[dict[str, Any]] = [{"type": "text", "text": "## Recent Conversation Context\n"}]
+            # Build context content.
+            # NOTE: We keep text in the system message, but images must be moved
+            # to the user message because some providers (like Hack Club AI/Gemini)
+            # do not support images in system messages.
+            context_text = ["## Recent Conversation Context\n"]
+            context_images = []
             
             for entry in context:
                 if isinstance(entry, str):
-                    context_content.append({"type": "text", "text": f"{entry}\n"})
+                    context_text.append(f"{entry}\n")
                 elif isinstance(entry, dict):
                     author = entry.get("author", "Unknown")
                     content_text = entry.get("content", "")
-                    context_content.append({"type": "text", "text": f"{author}: {content_text}\n"})
+                    context_text.append(f"{author}: {content_text}\n")
                     
                     # Add images from this context message if any
                     msg_images = entry.get("images", [])
                     for img in msg_images:
-                        context_content.append({
+                        context_images.append({
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:{img['mime_type']};base64,{img['base64']}",
                             },
                         })
             
-            messages.append({"role": "system", "content": context_content})
+            messages.append({"role": "system", "content": "".join(context_text)})
+            
+            # If there were images in context, add them to a separate user message 
+            # before the final user prompt to ensure they are seen by the model.
+            if context_images:
+                messages.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "## Context Images from previous messages:"}
+                    ] + context_images
+                })
 
         user_prompt = (
             f"[Responding to Discord user '{author_name}']\n\n{user_message}"
