@@ -6,9 +6,13 @@ All commands are permission-gated to the 'gork-manager' role.
 
 from __future__ import annotations
 
+import gzip
 import io
+import json
 import logging
+import shutil
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
@@ -86,6 +90,106 @@ def register_commands(
     """
     tree = bot.tree
     role_name = manager_role_name(config)
+
+    # ══ /backup & /restore ══════════════════════════════════════════════════
+
+    @tree.command(name="backup", description="Create a compressed backup of the current state.")
+    async def backup_command(interaction: discord.Interaction) -> None:
+        if not has_manager_role(interaction, config):
+            await _deny(interaction, gork_log, "backup")
+            return
+
+        from state import STATE_PATH
+        if not STATE_PATH.exists():
+            await interaction.response.send_message("⚠️ No state file found to backup.", ephemeral=True)
+            return
+
+        backup_dir = STATE_PATH.parent / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = int(time.time())
+        backup_path = backup_dir / f"state_{timestamp}.json.gz"
+
+        try:
+            # Save current in-memory state to disk first to ensure backup is fresh
+            state._save()
+
+            with STATE_PATH.open("rb") as f_in:
+                with gzip.open(backup_path, "wb") as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            
+            await interaction.response.send_message(
+                f"✅ State backed up to `{backup_path.name}`", ephemeral=True
+            )
+            await gork_log.info(
+                "State backup created",
+                guild_id=interaction.guild.id if interaction.guild else None,
+                by=f"{interaction.user} ({interaction.user.id})",
+                file=backup_path.name,
+            )
+        except Exception as exc:
+            log.exception("Backup failed")
+            await interaction.response.send_message(f"❌ Backup failed: {exc}", ephemeral=True)
+
+    @tree.command(name="restore", description="Restore state from the latest backup.")
+    async def restore_command(interaction: discord.Interaction) -> None:
+        if not has_manager_role(interaction, config):
+            await _deny(interaction, gork_log, "restore")
+            return
+
+        from state import STATE_PATH
+        backup_dir = STATE_PATH.parent / "backups"
+        if not backup_dir.exists():
+            await interaction.response.send_message("⚠️ No backups directory found.", ephemeral=True)
+            return
+
+        backups = sorted(backup_dir.glob("state_*.json.gz"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not backups:
+            await interaction.response.send_message("⚠️ No backup files found.", ephemeral=True)
+            return
+
+        latest_backup = backups[0]
+        
+        view = ConfirmationView(timeout=30.0)
+        await interaction.response.send_message(
+            f"❓ Are you sure you want to restore the latest backup: `{latest_backup.name}`?\n"
+            "This will overwrite the current state and reload it. This action cannot be undone.",
+            view=view,
+            ephemeral=True
+        )
+
+        await view.wait()
+
+        if view.value is None:
+            await interaction.edit_original_response(content="⌛ Confirmation timed out. Restore cancelled.", view=None)
+            return
+        
+        if not view.value:
+            await interaction.edit_original_response(content="❌ Restore cancelled.", view=None)
+            return
+
+        await interaction.edit_original_response(content="⏳ Restoring state...", view=None)
+
+        try:
+            # Restore the file
+            with gzip.open(latest_backup, "rb") as f_in:
+                with STATE_PATH.open("wb") as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            
+            # Reload the state object
+            from state import _load_raw
+            state._data = _load_raw()
+
+            await interaction.edit_original_response(content=f"✅ State restored from `{latest_backup.name}` and reloaded.")
+            await gork_log.info(
+                "State restored from backup",
+                guild_id=interaction.guild.id if interaction.guild else None,
+                by=f"{interaction.user} ({interaction.user.id})",
+                file=latest_backup.name,
+            )
+        except Exception as exc:
+            log.exception("Restore failed")
+            await interaction.edit_original_response(content=f"❌ Restore failed: {exc}")
 
     # ══ /blacklist ════════════════════════════════════════════════════════════
 
