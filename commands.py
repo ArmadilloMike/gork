@@ -21,6 +21,27 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("gork.commands")
 
+# ── Confirmation View ──────────────────────────────────────────────────────────
+
+class ConfirmationView(discord.ui.View):
+    """A simple confirmation view with 'Confirm' and 'Cancel' buttons."""
+    def __init__(self, timeout: float = 60.0):
+        super().__init__(timeout=timeout)
+        self.value = None
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = True
+        self.stop()
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = False
+        self.stop()
+        await interaction.response.defer()
+
+
 # ── Permission check ──────────────────────────────────────────────────────────
 
 def manager_role_name(config: dict) -> str:
@@ -823,20 +844,34 @@ def register_commands(
             await _deny(interaction, gork_log, "clear-cache")
             return
 
-        # Defer because this might take a moment if the guild is huge
-        await interaction.response.defer(ephemeral=True)
+        view = ConfirmationView()
+        await interaction.response.send_message(
+            "⚠️ **Warning:** This will wipe ALL AI memories for all members of this server. "
+            "Relationships will be preserved. Are you sure you want to proceed?",
+            view=view,
+            ephemeral=True
+        )
+
+        await view.wait()
+
+        if view.value is None:
+            await interaction.edit_original_response(content="⌛ Confirmation timed out. Operation cancelled.", view=None)
+            return
+        
+        if not view.value:
+            await interaction.edit_original_response(content="❌ Operation cancelled.", view=None)
+            return
+
+        # Update message to show progress
+        await interaction.edit_original_response(content="⏳ Clearing memories...", view=None)
 
         # Collect all member IDs.
-        # Note: If the guild is very large, interaction.guild.members might not be fully populated
-        # unless intents are enabled and members are cached.
-        # But we'll work with what we have.
         member_ids = [m.id for m in interaction.guild.members]
         
         count = state.clear_memories_for_users(member_ids)
 
-        await interaction.followup.send(
-            f"✅ Cleared memories for {count} users in this server. (Relationships preserved)",
-            ephemeral=True
+        await interaction.edit_original_response(
+            content=f"✅ Cleared memories for {count} users in this server. (Relationships preserved)"
         )
 
         await gork_log.mod(
