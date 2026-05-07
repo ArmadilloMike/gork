@@ -812,6 +812,41 @@ def register_commands(
 
     tree.add_command(relationship_group)
 
+    @tree.command(name="clear-cache", description="Wipe all AI memories for members of this server.")
+    async def clear_cache(interaction: discord.Interaction) -> None:
+        """Clear all memories for the current guild excluding relationships."""
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        if not has_manager_role(interaction, config):
+            await _deny(interaction, gork_log, "clear-cache")
+            return
+
+        # Defer because this might take a moment if the guild is huge
+        await interaction.response.defer(ephemeral=True)
+
+        # Collect all member IDs.
+        # Note: If the guild is very large, interaction.guild.members might not be fully populated
+        # unless intents are enabled and members are cached.
+        # But we'll work with what we have.
+        member_ids = [m.id for m in interaction.guild.members]
+        
+        count = state.clear_memories_for_users(member_ids)
+
+        await interaction.followup.send(
+            f"✅ Cleared memories for {count} users in this server. (Relationships preserved)",
+            ephemeral=True
+        )
+
+        await gork_log.mod(
+            "Cache cleared",
+            guild_id=interaction.guild.id,
+            by=f"{interaction.user} ({interaction.user.id})",
+            users_cleared=count,
+            guild=str(interaction.guild),
+        )
+
 # ── Shared denial helper ──────────────────────────────────────────────────────
 
 async def _deny(

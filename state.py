@@ -368,6 +368,22 @@ class BotState:
             return True
         return False
 
+    def clear_memories_for_users(self, user_ids: list[int]) -> int:
+        """
+        Delete all memories for a list of users.
+        Returns the number of users whose memories were cleared.
+        """
+        cleared_count = 0
+        for user_id in user_ids:
+            uid_str = str(user_id)
+            if uid_str in self._data["user_memories"]:
+                del self._data["user_memories"][uid_str]
+                cleared_count += 1
+        
+        if cleared_count > 0:
+            self._save()
+        return cleared_count
+
     # ── Bot enabled ────────────────────────────────────────────────────────────
 
     def set_bot_enabled(self, enabled: bool) -> None:

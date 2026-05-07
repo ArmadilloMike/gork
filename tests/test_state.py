@@ -138,3 +138,29 @@ def test_migration_and_global_blacklist(mock_state_path):
     assert state.is_user_blacklisted(444, 999) is True
     assert state.is_user_blacklisted(444, 888) is False
     assert state.is_user_blacklisted(444) is False # Global check
+
+def test_clear_memories_for_users(mock_state_path):
+    state = BotState()
+    user1 = 101
+    user2 = 102
+    user3 = 103
+    
+    state.set_user_memory(user1, "trait", "funny")
+    state.set_user_memory(user2, "trait", "serious")
+    state.set_user_memory(user3, "trait", "random")
+    
+    assert state.get_user_memory(user1, "trait") == "funny"
+    assert state.get_user_memory(user2, "trait") == "serious"
+    assert state.get_user_memory(user3, "trait") == "random"
+    
+    # Clear memories for user1 and user2
+    count = state.clear_memories_for_users([user1, user2])
+    assert count == 2
+    
+    assert state.get_user_memory(user1, "trait") is None
+    assert state.get_user_memory(user2, "trait") is None
+    assert state.get_user_memory(user3, "trait") == "random"
+    
+    # Try clearing again (should be 0)
+    count = state.clear_memories_for_users([user1, user2])
+    assert count == 0
