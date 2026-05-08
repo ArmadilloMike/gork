@@ -431,17 +431,32 @@ async def on_message(message: discord.Message) -> None:
         now = time.time()
         last_typing = typing_cooldowns.get(message.channel.id, 0)
         
-        if now - last_typing >= 2.0:
+        if now - last_typing >= 5.0:
             typing_cooldowns[message.channel.id] = now
-            async with message.channel.typing():
-                response = await ai_client.generate_response(
-                    user_message=user_text,
-                    author_name=str(message.author.display_name),
-                    context=context,
-                    memories=memories,
-                    images=images if images else None,
-                    guild_relationships=guild_relationships if guild_relationships else None,
-                )
+            try:
+                async with message.channel.typing():
+                    response = await ai_client.generate_response(
+                        user_message=user_text,
+                        author_name=str(message.author.display_name),
+                        context=context,
+                        memories=memories,
+                        images=images if images else None,
+                        guild_relationships=guild_relationships if guild_relationships else None,
+                    )
+            except discord.HTTPException as e:
+                if e.status == 429:
+                    log.warning(f"Typing indicator rate limited in {message.channel.id}")
+                    # Fallback to generation without typing indicator
+                    response = await ai_client.generate_response(
+                        user_message=user_text,
+                        author_name=str(message.author.display_name),
+                        context=context,
+                        memories=memories,
+                        images=images if images else None,
+                        guild_relationships=guild_relationships if guild_relationships else None,
+                    )
+                else:
+                    raise
         else:
             response = await ai_client.generate_response(
                 user_message=user_text,
