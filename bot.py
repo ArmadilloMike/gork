@@ -50,6 +50,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # GorkLogger is created after bot exists (needs the client reference)
 gork_log: GorkLogger | None = None
 
+# Typing indicator cooldowns: {channel_id: last_typing_time}
+typing_cooldowns: dict[int, float] = {}
+
 
 # ── Status change ───────────────────────────────────────────────────────────────
 
@@ -332,99 +335,114 @@ async def on_message(message: discord.Message) -> None:
         )
 
     # ── Generate & send response ──────────────────────────────────────────────
-    async with message.channel.typing():
-        if is_image_request:
-            try:
-                image_bytes = await image_client.generate(image_prompt)
-                file = discord.File(fp=io.BytesIO(image_bytes), filename="gork_image.png")
-                
-                # Generate a short sentence about the image
-                caption = await generate_image_caption(ai_client, config, image_prompt)
-                await message.reply(content=caption, file=file)
-
-                if gork_log:
-                    await gork_log.success(
-                        "Image generated (auto)",
-                        guild_id=message.guild.id if message.guild else None,
-                        user=f"{message.author} ({message.author.id})",
-                        prompt=image_prompt[:200],
-                        jump_url=jump_url,
-                    )
-                return
-            except Exception as exc:
-                log.exception("Auto image generation failed")
-                await message.reply(f"⚠️ Couldn't generate that image: {exc}")
-                return
-
-        # Extract images from message
-        images = await extract_images_from_message(message)
-        if images:
-            log.info(f"Extracted {len(images)} image(s) from message for multimodal input")
-        
-        
-        # Fetch recent messages for context
-        context_limit = config.get("context_message_limit", 15)
-        context = []
+    if is_image_request:
         try:
-            async for msg in message.channel.history(limit=context_limit, before=message):
-                # Extract images from this context message
-                msg_images = await extract_images_from_message(msg)
-                
-                # Add to context as a structured dict
-                context.append({
-                    "author": msg.author.display_name,
-                    "content": process_emojis(msg.content),
-                    "images": msg_images
-                })
-            # Reverse to oldest first
-            context.reverse()
-        except Exception as e:
-            log.warning(f"Failed to fetch message history: {e}")
-            context = None
+            image_bytes = await image_client.generate(image_prompt)
+            file = discord.File(fp=io.BytesIO(image_bytes), filename="gork_image.png")
+            
+            # Generate a short sentence about the image
+            caption = await generate_image_caption(ai_client, config, image_prompt)
+            await message.reply(content=caption, file=file)
 
-        # Fetch user memories
-        memories = state.get_user_memories(message.author.id)
-        if not memories:
-            memories = None
+            if gork_log:
+                await gork_log.success(
+                    "Image generated (auto)",
+                    guild_id=message.guild.id if message.guild else None,
+                    user=f"{message.author} ({message.author.id})",
+                    prompt=image_prompt[:200],
+                    jump_url=jump_url,
+                )
+            return
+        except Exception as exc:
+            log.exception("Auto image generation failed")
+            await message.reply(f"⚠️ Couldn't generate that image: {exc}")
+            return
 
-        # Fetch guild relationships
-        guild_relationships = {}
-        if message.guild:
-            rel_ids = state.get_guild_relationships(message.guild.id)
-            for rel_type, ids in rel_ids.items():
-                if isinstance(ids, list):
-                    names = []
-                    for uid in ids:
-                        # Try cache first, then fetch
-                        member = message.guild.get_member(uid)
-                        if not member:
-                            try:
-                                member = await message.guild.fetch_member(uid)
-                            except discord.NotFound:
-                                # Fallback to global user cache if they left the guild
-                                member = bot.get_user(uid)
-                            except Exception:
-                                member = None
-                        
-                        if member:
-                            names.append(member.display_name if hasattr(member, 'display_name') else member.name)
-                    if names:
-                        guild_relationships[rel_type] = names
-                else:
-                    uid = ids
+    # Extract images from message
+    images = await extract_images_from_message(message)
+    if images:
+        log.info(f"Extracted {len(images)} image(s) from message for multimodal input")
+    
+    
+    # Fetch recent messages for context
+    context_limit = config.get("context_message_limit", 15)
+    context = []
+    try:
+        async for msg in message.channel.history(limit=context_limit, before=message):
+            # Extract images from this context message
+            msg_images = await extract_images_from_message(msg)
+            
+            # Add to context as a structured dict
+            context.append({
+                "author": msg.author.display_name,
+                "content": process_emojis(msg.content),
+                "images": msg_images
+            })
+        # Reverse to oldest first
+        context.reverse()
+    except Exception as e:
+        log.warning(f"Failed to fetch message history: {e}")
+        context = None
+
+    # Fetch user memories
+    memories = state.get_user_memories(message.author.id)
+    if not memories:
+        memories = None
+
+    # Fetch guild relationships
+    guild_relationships = {}
+    if message.guild:
+        rel_ids = state.get_guild_relationships(message.guild.id)
+        for rel_type, ids in rel_ids.items():
+            if isinstance(ids, list):
+                names = []
+                for uid in ids:
+                    # Try cache first, then fetch
                     member = message.guild.get_member(uid)
                     if not member:
                         try:
                             member = await message.guild.fetch_member(uid)
                         except discord.NotFound:
+                            # Fallback to global user cache if they left the guild
                             member = bot.get_user(uid)
                         except Exception:
                             member = None
                     
                     if member:
-                        guild_relationships[rel_type] = member.display_name if hasattr(member, 'display_name') else member.name
+                        names.append(member.display_name if hasattr(member, 'display_name') else member.name)
+                if names:
+                    guild_relationships[rel_type] = names
+            else:
+                uid = ids
+                member = message.guild.get_member(uid)
+                if not member:
+                    try:
+                        member = await message.guild.fetch_member(uid)
+                    except discord.NotFound:
+                        member = bot.get_user(uid)
+                    except Exception:
+                        member = None
+                
+                if member:
+                    guild_relationships[rel_type] = member.display_name if hasattr(member, 'display_name') else member.name
 
-        try:
+    try:
+        # ── Typing Indicator with Cooldown ────────────────────────────────────
+        now = time.time()
+        last_typing = typing_cooldowns.get(message.channel.id, 0)
+        
+        if now - last_typing >= 2.0:
+            typing_cooldowns[message.channel.id] = now
+            async with message.channel.typing():
+                response = await ai_client.generate_response(
+                    user_message=user_text,
+                    author_name=str(message.author.display_name),
+                    context=context,
+                    memories=memories,
+                    images=images if images else None,
+                    guild_relationships=guild_relationships if guild_relationships else None,
+                )
+        else:
             response = await ai_client.generate_response(
                 user_message=user_text,
                 author_name=str(message.author.display_name),
@@ -433,39 +451,39 @@ async def on_message(message: discord.Message) -> None:
                 images=images if images else None,
                 guild_relationships=guild_relationships if guild_relationships else None,
             )
+        
+        # Clean "Gork:" or "gork:" prefix from the response
+        while response.lower().startswith("gork:"):
+            response = response[5:].strip()
             
-            # Clean "Gork:" or "gork:" prefix from the response
-            while response.lower().startswith("gork:"):
-                response = response[5:].strip()
-                
-        except AICapacityError as exc:
-            log.warning("wait a minute, the ai service is overloaded.")
-            if gork_log:
-                await gork_log.error(
-                    "AI service overloaded",
-                    exc=exc,
-                    guild_id=message.guild.id if message.guild else None,
-                    user=f"{message.author} ({message.author.id})",
-                    channel=channel_str,
-                    input=user_text[:200],
-                    jump_url=jump_url,
-                )
-            await message.reply("my brain is full right now. try again in a bit when i'm less popular.")
-            return
-        except Exception as exc:
-            log.exception("AI generation failed")
-            if gork_log:
-                await gork_log.error(
-                    "AI generation failed",
-                    exc=exc,
-                    guild_id=message.guild.id if message.guild else None,
-                    user=f"{message.author} ({message.author.id})",
-                    channel=channel_str,
-                    input=user_text[:200],
-                    jump_url=jump_url,
-                )
-            await message.reply("im having trouble thinking, try again in like a minute")
-            return
+    except AICapacityError as exc:
+        log.warning("wait a minute, the ai service is overloaded.")
+        if gork_log:
+            await gork_log.error(
+                "AI service overloaded",
+                exc=exc,
+                guild_id=message.guild.id if message.guild else None,
+                user=f"{message.author} ({message.author.id})",
+                channel=channel_str,
+                input=user_text[:200],
+                jump_url=jump_url,
+            )
+        await message.reply("my brain is full right now. try again in a bit when i'm less popular.")
+        return
+    except Exception as exc:
+        log.exception("AI generation failed")
+        if gork_log:
+            await gork_log.error(
+                "AI generation failed",
+                exc=exc,
+                guild_id=message.guild.id if message.guild else None,
+                user=f"{message.author} ({message.author.id})",
+                channel=channel_str,
+                input=user_text[:200],
+                jump_url=jump_url,
+            )
+        await message.reply("im having trouble thinking, try again in like a minute")
+        return
 
     chunks = split_long_message(response)
     for i, chunk in enumerate(chunks):
