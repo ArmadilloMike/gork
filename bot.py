@@ -134,6 +134,9 @@ async def on_ready() -> None:
     """Fires once connected. Wires logger, registers commands, syncs tree."""
     global gork_log, _commands_registered
     gork_log = GorkLogger(bot, state)
+    
+    # Inject logger into AI client now that it's initialized
+    ai_client._logger = gork_log
 
     # on_ready can fire multiple times on reconnect — only register once
     if not _commands_registered:

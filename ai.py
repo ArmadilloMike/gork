@@ -4,12 +4,17 @@ Handles all communication with the Hack Club AI API.
 Isolated from Discord logic; receives plain strings, returns plain strings.
 """
 
+from __future__ import annotations
 import asyncio
 import logging
 import json
-from typing import Any
+import re
+from typing import Any, TYPE_CHECKING
 
 import aiohttp
+
+if TYPE_CHECKING:
+    from gork_logger import GorkLogger
 
 log = logging.getLogger("gork.ai")
 
@@ -36,11 +41,12 @@ class AIClient:
     - Handle errors gracefully
     """
 
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(self, config: dict[str, Any], logger: GorkLogger | None = None) -> None:
         self._personality: dict[str, Any] = config.get("personality", {})
         self._model: str = config.get("model", MODEL)
         self._api_url: str = config.get("api_url", HACKCLUB_API_URL)
         self._session: aiohttp.ClientSession | None = None
+        self._logger = logger
 
         # API key is required — get one at https://ai.hackclub.com/dashboard
         api_key: str = config.get("hackclub_api_key", "")
@@ -402,6 +408,36 @@ class AIClient:
 
     # ── API call ──────────────────────────────────────────────────────────────
 
+    def _validate_response(self, text: str) -> list[str]:
+        """
+        Check if the AI output complies with Gork's strict brevity rules.
+        Returns a list of violation descriptions. Empty if compliant.
+        """
+        violations = []
+
+        # 1. No paragraph breaks
+        if "\n" in text.strip():
+            violations.append("Paragraph breaks detected")
+
+        # 2. Max 25 words
+        words = text.split()
+        if len(words) > 25:
+            violations.append(f"Too long ({len(words)} words, max 25)")
+
+        # 3. Max 2 sentences
+        # Simple sentence splitter (covers . ! ?)
+        sentences = [s for s in re.split(r'[.!?]+', text) if s.strip()]
+        if len(sentences) > 2:
+            violations.append(f"Too many sentences ({len(sentences)}, max 2)")
+
+        # 4. Max 1 comma per sentence
+        for i, s in enumerate(sentences):
+            commas = s.count(',')
+            if commas > 1:
+                violations.append(f"Too many commas in sentence {i+1} ({commas}, max 1)")
+
+        return violations
+
     async def generate_response(
         self, user_message: str, author_name: str = "User", context: list[Any] | None = None, memories: dict[str, str] | None = None, images: list[dict] | None = None, guild_relationships: dict[str, Any] | None = None
     ) -> str:
@@ -454,7 +490,39 @@ class AIClient:
                         if "at capacity" in err_msg or "temporarily unavailable" in err_msg:
                             raise AICapacityError(f"AI service overloaded: {data['error'].get('message')}")
 
-                    return self._parse_response(data)
+                    response_text = self._parse_response(data)
+
+                    # Enforcement: Validate length + tone constraints
+                    violations = self._validate_response(response_text)
+                    if violations:
+                        violation_msg = ", ".join(violations)
+                        log.warning(f"Response violation (attempt {attempt + 1}): {violation_msg}")
+                        log.debug(f"Violating text: {response_text!r}")
+                        
+                        # Log to Discord channel if logger is available
+                        if self._logger:
+                            asyncio.create_task(self._logger.warning(
+                                "AI response violation",
+                                attempt=str(attempt + 1),
+                                violations=violation_msg,
+                                response=response_text[:200]
+                            ))
+
+                        # Only retry if we have attempts left
+                        if attempt < max_retries - 1:
+                            # Adjust payload slightly to try and force compliance
+                            # We can't easily change the prompt here without rebuilding, 
+                            # but the system prompt already has the rules.
+                            # Just let the retry loop try again.
+                            continue
+                        else:
+                            # If final attempt still violates, we truncate as a last resort
+                            log.error(f"Final attempt still violates constraints. Truncating.")
+                            response_text = " ".join(response_text.split()[:25])
+                            # Remove line breaks
+                            response_text = response_text.replace("\n", " ")
+
+                    return response_text
 
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 if attempt < max_retries - 1:
