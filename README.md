@@ -201,6 +201,13 @@ MIT License
 
 ---
 
+## ⚖️ Legal
+
+- [Terms of Service](TERMS.md)
+- [Privacy Policy](PRIVACY.md)
+
+---
+
 ## 🛠️ Troubleshooting
 
 - **Commands not appearing?** Use `/gork help` to force a sync, or set `sync_guild_id` in config for instant updates in development.
