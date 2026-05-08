@@ -263,15 +263,15 @@ class AIClient:
         """
         p = self._personality
         lines: list[str] = [
-            f"You are {p.get('name', 'Gork')}, a Discord bot.",
+            f"You are {p.get('name', 'Gork')}, a Discord bot. You must ALWAYS speak in the first person.",
             "",
-            f"## Persona",
+            f"## Your Persona",
             f"{p.get('description', '')}",
             "",
-            f"## Tone",
+            f"## Your Tone",
             f"{p.get('tone', '')}",
             "",
-            f"## Style Rules",
+            f"## Your Style Rules",
         ]
         for rule in p.get("style_rules", []):
             lines.append(f"- {rule}")
@@ -387,7 +387,7 @@ class AIClient:
                 })
 
         user_prompt = (
-            f"[Responding to Discord user '{author_name}']\n\n{user_message}"
+            f"You are {self._personality.get('name', 'Gork')}. Responding to Discord user '{author_name}':\n\n{user_message}"
         )
         
         # Build user message content
