@@ -15,7 +15,7 @@ from discord.ext import commands
 from ai import AIClient, AICapacityError
 from image_gen import ImageGenClient
 from commands import register_commands
-from config_loader import load_config
+from config_loader import load_config, save_config
 from gork_logger import GorkLogger
 from state import BotState
 from utils import extract_user_message, is_triggered_by_reply, split_long_message, process_emojis, extract_images_from_message
@@ -184,6 +184,47 @@ async def on_ready() -> None:
 
     # Start the status change loop
     bot.loop.create_task(status_change_loop(bot, state, ai_client, config))
+
+
+@bot.event
+async def on_guild_join(guild: discord.Guild) -> None:
+    """Fires when the bot joins a new server. Adds the guild to config and syncs commands."""
+    log.info(f"Joined new guild: {guild.name} ({guild.id})")
+    
+    # Update config.json
+    sync_guild_id = config.get("sync_guild_id")
+    
+    if sync_guild_id is None:
+        config["sync_guild_id"] = [guild.id]
+    elif isinstance(sync_guild_id, list):
+        if guild.id not in sync_guild_id:
+            sync_guild_id.append(guild.id)
+    else:
+        # It was a single ID, convert to list
+        if sync_guild_id != guild.id:
+            config["sync_guild_id"] = [sync_guild_id, guild.id]
+        else:
+            config["sync_guild_id"] = [sync_guild_id]
+            
+    save_config(config)
+    
+    # Sync slash commands to the new guild
+    try:
+        guild_obj = discord.Object(id=guild.id)
+        bot.tree.copy_global_to(guild=guild_obj)
+        await bot.tree.sync(guild=guild_obj)
+        log.info(f"Slash commands synced to new guild {guild.id}.")
+    except Exception as e:
+        log.error(f"Failed to sync slash commands to new guild {guild.id}: {e}")
+
+    if gork_log:
+        await gork_log.info(
+            "Joined new guild",
+            guild_id=guild.id,
+            guild_name=guild.name,
+            owner=str(guild.owner),
+            member_count=str(guild.member_count)
+        )
 
 
 @bot.event

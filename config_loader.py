@@ -48,7 +48,28 @@ def load_config(path: Path | str | None = None) -> dict[str, Any]:
 
     log.info(f"Loaded config from '{config_path}'")
     _validate(config)
+    # Store the path so we can save back to it if needed
+    config["_config_path"] = config_path
     return config
+
+
+def save_config(config: dict[str, Any]) -> None:
+    """Save the configuration back to the file it was loaded from."""
+    config_path = config.get("_config_path")
+    if not config_path:
+        log.error("Cannot save config: no path found in config dict.")
+        return
+
+    # Don't save the internal path to the file
+    to_save = config.copy()
+    to_save.pop("_config_path", None)
+
+    try:
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump(to_save, fh, indent=2)
+        log.info(f"Saved config to '{config_path}'")
+    except Exception as e:
+        log.error(f"Failed to save config to '{config_path}': {e}")
 
 
 def _validate(config: dict[str, Any]) -> None:
