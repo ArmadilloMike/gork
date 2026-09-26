@@ -1,5 +1,5 @@
 {
-  "_comment": "Gork Bot Configuration — copy this file to config.json and fill in your tokens.",
+  "_comment": "Gork Bot Configuration - copy this file to config.json and fill in your tokens.",
 
   "discord_token": "YOUR_DISCORD_BOT_TOKEN_HERE",
   "hackclub_api_key": "YOUR_HACKCLUB_API_KEY",
