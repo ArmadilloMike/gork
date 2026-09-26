@@ -21,6 +21,7 @@ Gork responds when summoned, or when it detects you want to create something.
 - **Image Generation**: Generate images from text prompts with `/imagine` or natural language.
 - **Intelligent Intent Detection**: Automatically detects image-generation requests in normal conversation.
 - **Slash Commands**: Full suite of commands for management, blacklisting, whitelisting, and more.
+- **Message Context Menu**: Right-click any server message and choose **Reply with Gork**; users can do this in servers where Gork is not installed.
 - **Persistent State**: Blacklists, whitelists, user memories, and settings saved to disk.
 - **Structured Logging**: Console and optional Discord channel logging with embeds.
 - **Personality Customization**: Fully configurable bot personality and behavior via JSON.
@@ -75,6 +76,7 @@ pip install -r requirements.txt
    - Scopes: `bot`, `applications.commands`
    - Bot Permissions: `Send Messages`, `Read Message History`, `View Channels`, `Embed Links`, `Attach Files`
 6. Open the generated URL and invite Gork to your server.
+7. In **Installation**, enable **User Install** and include the `applications.commands` scope for user installs. This lets users use **Reply with Gork** in servers that have not installed Gork.
 
 ### 4. Configure the Bot
 
@@ -126,6 +128,7 @@ gork/
 | **Reply**                  | *Replies to Gork's message* | Includes conversation context          |
 | **Direct Message**         | `hey gork`                  | No @mention required in DMs            |
 | **Implicit Image Request** | `draw me a robot cat`       | Auto-detects intent to generate images |
+| **Message context menu**   | Right-click a message → **Apps** → **Reply with Gork** | Works in servers where the user installed Gork, even if the server has not |
 
 ---
 

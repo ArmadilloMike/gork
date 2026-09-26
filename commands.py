@@ -18,10 +18,14 @@ from typing import TYPE_CHECKING
 import discord
 from discord import app_commands
 
+from ai import AICapacityError
+from utils import extract_images_from_message, process_emojis, split_long_message
+
 if TYPE_CHECKING:
     from state import BotState
     from gork_logger import GorkLogger
     from image_gen import ImageGenClient
+    from ai import AIClient
 
 log = logging.getLogger("gork.commands")
 
@@ -74,6 +78,100 @@ def has_manager_role(interaction: discord.Interaction, config: dict) -> bool:
     )
 
 
+def _add_reply_context_menu(
+    tree: app_commands.CommandTree,
+    state: "BotState",
+    ai_client: "AIClient",
+) -> app_commands.ContextMenu:
+    """Register a user-installed message action that works in any server."""
+    async def reply_with_gork(
+        interaction: discord.Interaction,
+        message: discord.Message,
+    ) -> None:
+        guild_id = interaction.guild_id
+        channel_id = message.channel.id
+
+        if not state.bot_enabled:
+            await interaction.response.send_message(
+                "Gork is currently disabled.", ephemeral=True
+            )
+            return
+        if state.is_user_blacklisted(interaction.user.id, guild_id):
+            await interaction.response.send_message(
+                "You are blocked from interacting with Gork here.", ephemeral=True
+            )
+            return
+        if state.is_channel_blacklisted(channel_id, guild_id):
+            await interaction.response.send_message(
+                "Gork is blocked from responding in this channel.", ephemeral=True
+            )
+            return
+        if (
+            state.has_any_whitelisted_channels(guild_id)
+            and not state.is_channel_whitelisted(channel_id, guild_id)
+        ):
+            await interaction.response.send_message(
+                "Gork is only available in whitelisted channels.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer()
+        user_message = process_emojis(message.content.strip())
+        images = await extract_images_from_message(message)
+        if not user_message and not images:
+            user_message = "Respond to this message."
+
+        memories = state.get_user_memories(message.author.id) or None
+        relationships = (
+            state.get_guild_relationships(guild_id) if guild_id is not None else None
+        )
+
+        try:
+            response = await ai_client.generate_response(
+                user_message=user_message,
+                author_name=message.author.display_name,
+                context=[{
+                    "author": message.author.display_name,
+                    "content": user_message,
+                    "images": images,
+                }],
+                memories=memories,
+                images=images or None,
+                guild_relationships=relationships or None,
+            )
+        except AICapacityError:
+            await interaction.followup.send(
+                "my brain is full right now. try again in a bit when i'm less popular.",
+                ephemeral=True,
+            )
+            return
+        except RuntimeError:
+            log.exception("AI generation failed for message context-menu reply")
+            await interaction.followup.send(
+                "im having trouble thinking, try again in like a minute",
+                ephemeral=True,
+            )
+            return
+
+        while response.lower().startswith("gork:"):
+            response = response[5:].strip()
+        for chunk in split_long_message(response):
+            await interaction.followup.send(
+                chunk, allowed_mentions=discord.AllowedMentions.none()
+            )
+
+    command = app_commands.ContextMenu(
+        name="Reply with Gork",
+        callback=reply_with_gork,
+        allowed_contexts=app_commands.AppCommandContext(
+            guild=True, dm_channel=False, private_channel=False
+        ),
+        allowed_installs=app_commands.AppInstallationType(guild=False, user=True),
+    )
+    tree.add_command(command)
+    return command
+
+
 # ── Command registration ──────────────────────────────────────────────────────
 
 def register_commands(
@@ -90,6 +188,7 @@ def register_commands(
     """
     tree = bot.tree
     role_name = manager_role_name(config)
+    _add_reply_context_menu(tree, state, ai_client)
 
     # ══ /backup & /restore ══════════════════════════════════════════════════
 
